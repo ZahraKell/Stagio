@@ -31,9 +31,9 @@ def login(request):
     if user:
         refresh = RefreshToken.for_user(user)
         return Response({
-            'access': str(refresh.access_token),  
-            'refresh': str(refresh),              
-            'role': user.role                     
+            'access': str(refresh.access_token),   # short-lived token
+            'refresh': str(refresh),               # long-lived token
+            'role': user.role                      # student/company/admin
         })
     return Response(
         {'error': 'Wrong username or password'},
@@ -41,6 +41,8 @@ def login(request):
     )
 
 
+# ── ME (who am i) ──────────────────────────
+# IsAuthenticated = must send token to access
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me(request):
