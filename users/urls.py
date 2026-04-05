@@ -8,7 +8,6 @@ urlpatterns = [
     path('me/', views.me),
     path('token/refresh/', TokenRefreshView.as_view()),
 
-    # Role test endpoints
     path('student-only/', views.student_only),
     path('company-only/', views.company_only),
     path('admin-only/', views.admin_only),
