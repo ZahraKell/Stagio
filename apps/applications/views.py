@@ -1,0 +1,261 @@
+from rest_framework.views       import APIView # type: ignore
+from rest_framework.response    import Response # type: ignore
+from rest_framework             import status # type: ignore
+from rest_framework.permissions import IsAuthenticated # type: ignore
+from django.shortcuts           import get_object_or_404 # type: ignore
+from django.db                  import IntegrityError   # type: ignore
+
+from .models       import Application
+from .serializers  import (
+    ApplicationListSerializer,
+    ApplicationDetailSerializer,
+    ApplicationWriteSerializer,
+    ApplicationReviewSerializer,
+)
+from .permissions  import (
+    IsStudent,
+    IsCompany,
+    IsAdmin,
+    IsApplicationOwner,
+    IsOfferOwnerOrAdmin,
+)
+#───────────────────────────────────
+
+def ok(data=None, message="OK", http_status=status.HTTP_200_OK):
+    return Response({"error": False, "message": message, "data": data}, status=http_status)
+
+def fail(message="Error", http_status=status.HTTP_400_BAD_REQUEST):
+    return Response({"error": True, "message": message}, status=http_status)
+
+# ─────────────────────────────────────────────
+#  VIEW 1 — SUBMIT AN APPLICATION
+class ApplicationListCreateView(APIView):
+    permission_classes = [IsStudent]
+
+    def post(self, request):
+        serializer = ApplicationWriteSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            # Return all validation errors at once (not just the first one)
+            return Response(
+                {"error": True, "message": "Validation failed.", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            application = serializer.save(
+                student=request.user,
+                status=Application.Status.PENDING,
+            )
+        except IntegrityError:
+            # unique_together (offer, student) was violated
+            # Flask equivalent: existing = Submission.query.filter_by(...).first()
+            #                   if existing: return ok(message="Already registered")
+            return fail(
+                "You have already applied to this offer.",
+                status.HTTP_409_CONFLICT,
+            )
+
+        return ok(
+            data={"id": application.pk},
+            message="Application submitted successfully.",
+            http_status=status.HTTP_201_CREATED,
+        )
+
+# ─────────────────────────────────────────────
+#  VIEW 2 — MY APPLICATIONS (student dashboard)
+class MyApplicationsView(APIView):
+    permission_classes = [IsStudent]
+
+    def get(self, request):
+        # Optional filter by status: ?status=PENDING
+        filter_status = request.query_params.get("status")
+
+        applications = Application.objects.filter(
+            student=request.user
+        ).select_related("offer", "offer__created_by").order_by("-created_at")
+
+        if filter_status:
+            applications = applications.filter(status=filter_status.upper())
+
+        serializer = ApplicationListSerializer(applications, many=True)
+        return ok(data=serializer.data)
+
+# ─────────────────────────────────────────────
+#  VIEW 3 — DETAIL, UPDATE, DELETE (student)
+class ApplicationDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk):
+        return get_object_or_404(
+            Application.objects.select_related(
+                "student", "offer", "offer__created_by"
+            ),
+            pk=pk,
+        )
+    
+    def get(self, request, pk):
+        application = self.get_object(pk)
+
+        # Access control — student sees own, company sees theirs, admin sees all
+        user = request.user
+        is_owner   = (application.student == user)
+        is_company = (user.role == "COMPANY" and application.offer.created_by == user)
+        is_admin   = (user.role == "ADMIN")
+
+        if not (is_owner or is_company or is_admin):
+            return fail("You do not have permission to view this application.", status.HTTP_403_FORBIDDEN)
+
+        serializer = ApplicationDetailSerializer(application)
+        return ok(data=serializer.data)
+
+    def patch(self, request, pk):
+        application = self.get_object(pk)
+
+        # Only the student who applied can edit
+        perm = IsApplicationOwner()
+        if not perm.has_object_permission(request, self, application):
+            return fail("You can only edit your own applications.", status.HTTP_403_FORBIDDEN)
+
+        # Cannot edit after it has been reviewed
+        if application.status != Application.Status.PENDING:
+            return fail(
+                "You can only edit applications that are still pending.",
+                status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = ApplicationWriteSerializer(
+            application,
+            data=request.data,
+            partial=True,   # PATCH = only send the fields you want to change
+        )
+
+        if not serializer.is_valid():
+            return Response(
+                {"error": True, "message": "Validation failed.", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer.save()
+        return ok(message="Application updated successfully.")
+
+    def delete(self, request, pk):
+        application = self.get_object(pk)
+
+        # Only the owner can withdraw
+        perm = IsApplicationOwner()
+        if not perm.has_object_permission(request, self, application):
+            return fail("You can only withdraw your own applications.", status.HTTP_403_FORBIDDEN)
+
+        # Cannot withdraw after decision has been made
+        if application.status in [Application.Status.ACCEPTED, Application.Status.REJECTED]:
+            return fail(
+                "Cannot withdraw an application that has already been decided.",
+                status.HTTP_403_FORBIDDEN,
+            )
+
+        application.delete()
+        return ok(message="Application withdrawn successfully.")
+# ─────────────────────────────────────────────
+#  VIEW 4 — COMPANY: LIST ALL APPLICANTS FOR AN OFFER
+class OfferApplicationsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, offer_id):
+        from offers.models import Offer   # local import to avoid circular imports
+
+        offer = get_object_or_404(Offer, pk=offer_id)
+
+        # Only the company that owns the offer, or admin, can see applicants
+        user = request.user
+        if not (user.role == "ADMIN" or offer.created_by == user):
+            return fail(
+                "Only the offer owner or an admin can view applicants.",
+                status.HTTP_403_FORBIDDEN,
+            )
+        # Optional status filter: ?status=PENDING
+        filter_status = request.query_params.get("status")
+        applications  = Application.objects.filter(
+            offer=offer
+        ).select_related("student", "offer").order_by("-created_at")
+
+        if filter_status:
+            applications = applications.filter(status=filter_status.upper())
+
+        serializer = ApplicationListSerializer(applications, many=True)
+        return ok(
+            data={
+                "offer_id":    offer.pk,
+                "offer_title": offer.title,
+                "count":       applications.count(),
+                "applications": serializer.data,
+            }
+        )
+# ─────────────────────────────────────────────
+#  VIEW 5 — COMPANY: REVIEW AN APPLICATION
+
+class ReviewApplicationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        application = get_object_or_404(
+            Application.objects.select_related("offer", "offer__created_by"),
+            pk=pk,
+        )
+
+        # Only the company that owns the offer (or admin) can review
+        perm = IsOfferOwnerOrAdmin()
+        if not perm.has_object_permission(request, self, application):
+            return fail(
+                "Only the offer owner or an admin can review applications.",
+                status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = ApplicationReviewSerializer(
+            data=request.data,
+            context={"application": application},
+        )
+
+        if not serializer.is_valid():
+            return Response(
+                {"error": True, "message": "Validation failed.", "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        new_status = serializer.validated_data["status"]
+        application.status = new_status
+        application.save(update_fields=["status"])
+
+        # Status messages mirror Flask's ok("Approved") / ok("Suspended")
+        messages = {
+            Application.Status.REVIEWED: "Application marked as under review.",
+            Application.Status.ACCEPTED: "Application accepted. A convention will be created.",
+            Application.Status.REJECTED: "Application rejected.",
+        }
+
+        return ok(
+            data={"id": application.pk, "status": application.status},
+            message=messages.get(new_status, "Status updated."),
+        )
+
+# ─────────────────────────────────────────────
+#  VIEW 6 — ADMIN: LIST ALL APPLICATIONS
+class AdminAllApplicationsView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        filter_status   = request.query_params.get("status")
+        filter_offer_id = request.query_params.get("offer_id")
+
+        applications = Application.objects.select_related(
+            "student", "offer", "offer__created_by"
+        ).order_by("-created_at")
+
+        if filter_status:
+            applications = applications.filter(status=filter_status.upper())
+
+        if filter_offer_id:
+            applications = applications.filter(offer_id=filter_offer_id)
+
+        serializer = ApplicationListSerializer(applications, many=True)
+        return ok(data=serializer.data)
