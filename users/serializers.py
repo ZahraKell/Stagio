@@ -1,9 +1,11 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
+from .models import Administration, Student, Company
+
 User = get_user_model()
 
-# Used for Register
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
@@ -19,9 +21,19 @@ class RegisterSerializer(serializers.ModelSerializer):
             full_name=validated_data.get('full_name', ''),
             role=validated_data.get('role', 'student'),
         )
+
+        if user.role == 'student':
+            Student.objects.create(
+                user=user,
+                student_number=f"STU{user.id:04d}"
+            )
+        elif user.role == 'company':
+            Company.objects.create(user=user)
+        elif user.role == 'administration':
+            Administration.objects.create(user=user)
         return user
 
-# Used to return user info
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
