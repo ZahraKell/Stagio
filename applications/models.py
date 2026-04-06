@@ -7,6 +7,7 @@ class Application(models.Model):
         ('pending', 'Pending'),
         ('accepted', 'Accepted'),
         ('refused', 'Refused'),
+        ('validated', 'Validated'),
     )
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='applications')
     offer = models.ForeignKey(InternshipOffer, on_delete=models.CASCADE, related_name='applications')
