@@ -1,5 +1,5 @@
 from django.db import models
-from apps.users.models import Company
+from users.models import Company
 
 class InternshipOffer(models.Model):
     STATUS_CHOICES = (

@@ -1,6 +1,6 @@
 from django.db import models
-from apps.users.models import Student
-from apps.offers.models import InternshipOffer
+from users.models import Student
+from offers.models import InternshipOffer
 
 class Application(models.Model):
     STATUS_CHOICES = (

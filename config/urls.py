@@ -1,12 +1,12 @@
 from django.contrib import admin
 from django.urls import path, include
-from apps.conventions.views import (
+from conventions.views import (
     DownloadConventionView,
     ConventionPreviewView,
 )
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('applications/', include('apps.applications.urls')),
+    path('applications/', include('applications.urls')),
      path(
         "<int:pk>/download/",
         DownloadConventionView.as_view(),

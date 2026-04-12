@@ -22,12 +22,12 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders', #CORS from frontend
     # Your apps
-    'apps.users',
-    'apps.offers',
-    'apps.applications',
-    'apps.notifications',
-    'apps.documents',
-    'apps.conventions',
+    'users',
+    'offers',
+    'applications',
+    'notifications',
+    'documents',
+    'conventions',
 ]
 
 MIDDLEWARE = [    #order matters for CORS/request handling

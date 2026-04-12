@@ -12,19 +12,18 @@ from reportlab.platypus         import (
     TableStyle, HRFlowable, KeepTogether
 )
 #colors
-DARK        = colors.HexColor("#1a1a2e")   # deep navy — headings
-BLUE        = colors.HexColor("#1a6bb5")   # primary blue — accents
-LIGHT_BLUE  = colors.HexColor("#e8f1fb")   # light blue — cell backgrounds
-MID         = colors.HexColor("#444444")   # body text
-MUTED       = colors.HexColor("#777777")   # secondary text
-BORDER      = colors.HexColor("#cccccc")   # table borders
-LIGHT_GRAY  = colors.HexColor("#f4f4f4")   # alternating row background
+DARK        = colors.HexColor("#1a1a2e")  
+BLUE        = colors.HexColor("#1a6bb5")   
+LIGHT_BLUE  = colors.HexColor("#e8f1fb")   
+MID         = colors.HexColor("#444444")   
+MUTED       = colors.HexColor("#777777")   
+BORDER      = colors.HexColor("#cccccc")   
+LIGHT_GRAY  = colors.HexColor("#f4f4f4")   
 WHITE       = colors.white
-GREEN       = colors.HexColor("#2d7d46")   # signed status
-ORANGE      = colors.HexColor("#c96a00")   # pending status
+GREEN       = colors.HexColor("#2d7d46")  
+ORANGE      = colors.HexColor("#c96a00")   
 #style
 def _styles():
-    """Build all paragraph styles used in the PDF."""
     base = getSampleStyleSheet()
 
     def S(name, parent="Normal", **kw):
@@ -82,7 +81,6 @@ def _styles():
 
 
 def _section_header(text, st):
-    """Blue full-width section header bar."""
     data = [[Paragraph(f"  {text}", st["section"])]]
     t = Table(data, colWidths=[17*cm])
     t.setStyle(TableStyle([
@@ -133,20 +131,19 @@ def _fmt_date(d):
 
 
 def _fmt_signed(dt):
-    """Return a signed/unsigned status string."""
     if dt is None:
         return "En attente de signature"
     return f"Signé le {_fmt_date(dt)}"
 
 #main functions
 def generate_convention_pdf(convention) -> str:
-    # ── Pull all related objects ──────────────
+    # ── Pull all related objects
     application = convention.application
     student     = application.student
     offer       = application.offer
-    company     = offer.created_by          # company User object
+    company     = offer.created_by         
 
-    # ── File path ─────────────────────────────
+    # ── File path 
     rel_dir  = f"conventions/{convention.pk}"
     abs_dir  = os.path.join(settings.MEDIA_ROOT, rel_dir)
     os.makedirs(abs_dir, exist_ok=True)
@@ -155,7 +152,7 @@ def generate_convention_pdf(convention) -> str:
     abs_path = os.path.join(abs_dir, filename)
     rel_path = os.path.join(rel_dir, filename)   # stored in DB
 
-    # ── Document setup ────────────────────────
+    # ── Document setup 
     W = A4[0] - 4*cm    # usable width
     doc = SimpleDocTemplate(
         abs_path,
@@ -178,7 +175,6 @@ def generate_convention_pdf(convention) -> str:
     ))
     story.append(HRFlowable(width=W, thickness=1.5, color=BLUE, spaceAfter=12))
 
-    # ── Intro paragraph ──
     story.append(Paragraph(
         "La présente convention est établie entre les parties désignées ci-dessous, "
         "conformément aux dispositions légales en vigueur régissant les stages en entreprise. "
@@ -188,9 +184,6 @@ def generate_convention_pdf(convention) -> str:
     ))
     story.append(Spacer(1, 6))
 
-    # ══════════════════════════════════════════
-    #  ARTICLE 1 — PARTIES
-    # ══════════════════════════════════════════
     story.append(_section_header("Article 1 — Parties de la Convention", st))
     story.append(Spacer(1, 8))
 
@@ -226,9 +219,6 @@ def generate_convention_pdf(convention) -> str:
         ("Validé via",       "Plateforme Stag.io"),
     ], st))
 
-    # ══════════════════════════════════════════
-    #  ARTICLE 2 — INTERNSHIP DETAILS
-    # ══════════════════════════════════════════
     story.append(Spacer(1, 4))
     story.append(_section_header("Article 2 — Objet et Modalités du Stage", st))
     story.append(Spacer(1, 8))
@@ -263,9 +253,6 @@ def generate_convention_pdf(convention) -> str:
         story.append(Paragraph("Compétences requises :", st["label"]))
         story.append(Paragraph(offer.skills, st["body"]))
 
-    # ══════════════════════════════════════════
-    #  ARTICLE 3 — OBLIGATIONS
-    # ══════════════════════════════════════════
     story.append(Spacer(1, 4))
     story.append(_section_header("Article 3 — Obligations des Parties", st))
     story.append(Spacer(1, 8))
@@ -310,9 +297,6 @@ def generate_convention_pdf(convention) -> str:
     ]))
     story.append(t)
 
-    # ══════════════════════════════════════════
-    #  ARTICLE 4 — CONFIDENTIALITY & INSURANCE
-    # ══════════════════════════════════════════
     story.append(Spacer(1, 4))
     story.append(_section_header("Article 4 — Confidentialité et Assurance", st))
     story.append(Spacer(1, 8))
@@ -332,9 +316,6 @@ def generate_convention_pdf(convention) -> str:
         st["body"]
     ))
 
-    # ══════════════════════════════════════════
-    #  ARTICLE 5 — SIGNATURES
-    # ══════════════════════════════════════════
     story.append(Spacer(1, 4))
     story.append(_section_header("Article 5 — Signatures et Validation", st))
     story.append(Spacer(1, 8))
@@ -347,7 +328,7 @@ def generate_convention_pdf(convention) -> str:
     ))
     story.append(Spacer(1, 6))
 
-    # ── Signature status boxes ─────────────────
+    # ── Signature status
     def sig_box(party, signed_at):
         is_signed = signed_at is not None
         status_text = _fmt_signed(signed_at)
@@ -394,9 +375,6 @@ def generate_convention_pdf(convention) -> str:
     ]))
     story.append(sig_table)
 
-    # ══════════════════════════════════════════
-    #  STATUS BANNER
-    # ══════════════════════════════════════════
     story.append(Spacer(1, 12))
 
     status_colors = {
@@ -425,9 +403,6 @@ def generate_convention_pdf(convention) -> str:
     ]))
     story.append(status_t)
 
-    # ══════════════════════════════════════════
-    #  PAGE FOOTER (on every page)
-    # ══════════════════════════════════════════
     def on_page(canvas, doc):
         canvas.saveState()
         canvas.setFont("Helvetica", 7.5)
@@ -440,7 +415,7 @@ def generate_convention_pdf(convention) -> str:
         canvas.drawRightString(A4[0]-2*cm, 1.2*cm, f"Page {doc.page}")
         canvas.restoreState()
 
-    # ── Build PDF ─────────────────────────────
+    # ── Build PDF
     doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
 
     return rel_path

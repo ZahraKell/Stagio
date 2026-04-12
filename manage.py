@@ -1,11 +1,8 @@
-#!/usr/bin/env python
-"""Django's command-line utility for administrative tasks."""
 import os     #sys vars
 import sys    #terminal commands
 
 
 def main():
-    """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings') #config/settings.py:db,server,apps,security,static files, etc
     try:
         from django.core.management import execute_from_command_line # type: ignore # python manage.py commands

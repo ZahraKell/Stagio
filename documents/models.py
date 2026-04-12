@@ -1,6 +1,6 @@
 from django.db import models
-from apps.applications.models import Application
-from apps.users.models import Administration
+from applications.models import Application
+from users.models import Administration
 
 class Agreement(models.Model):
     application = models.OneToOneField(Application, on_delete=models.CASCADE, related_name='agreement')
