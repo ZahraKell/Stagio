@@ -33,7 +33,7 @@ def login(request):
         return Response({
             'access': str(refresh.access_token),   
             'refresh': str(refresh),               
-            'role': user.role                      
+            'role': user.role                     
         })
     return Response(
         {'error': 'Wrong username or password'},
