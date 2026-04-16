@@ -22,11 +22,11 @@ def _can_access_convention(user, convention):
     Returns True if the user is allowed to access this convention.
     Called inside the view before serving the file.
     """
-    if user.role == "ADMIN":
+    if user.role in ["admin", "administration"]:
         return True
 
-    student = convention.application.student
-    company = convention.application.offer.created_by
+    student = convention.application.student.user
+    company = convention.application.offer.company.user
 
     if user == student:
         return True
@@ -43,9 +43,9 @@ class DownloadConventionView(APIView):
         convention = get_object_or_404(
             Convention.objects.select_related(
                 "application",
-                "application__student",
+                "application__student__user",
                 "application__offer",
-                "application__offer__created_by",
+                "application__offer__company__user",
             ),
             pk=pk,
         )
@@ -78,7 +78,7 @@ class DownloadConventionView(APIView):
 
         # FileResponse streams the file directly to the browser
         # as_attachment=True → browser downloads it instead of displaying it
-        student_name = convention.application.student.full_name.replace(" ", "_")
+        student_name = convention.application.student.user.full_name.replace(" ", "_")
         download_name = f"Convention_Stage_{student_name}_CONV{pk:04d}.pdf"
 
         response = FileResponse(
@@ -96,9 +96,9 @@ class ConventionPreviewView(APIView):
         convention = get_object_or_404(
             Convention.objects.select_related(
                 "application",
-                "application__student",
+                "application__student__user",
                 "application__offer",
-                "application__offer__created_by",
+                "application__offer__company__user",
             ),
             pk=pk,
         )
@@ -110,7 +110,7 @@ class ConventionPreviewView(APIView):
             )
 
         student = convention.application.student
-        company = convention.application.offer.created_by
+        company = convention.application.offer.company
         offer   = convention.application.offer
 
         return ok(data={
@@ -134,7 +134,7 @@ class ConventionPreviewView(APIView):
             # Internship details
             "offer": {
                 "title":    offer.title,
-                "location": offer.location,
+                "location": offer.town,
                 "type":     offer.internship_type,
                 "duration": offer.duration,
                 "is_paid":  offer.is_paid,

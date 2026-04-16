@@ -8,7 +8,7 @@ class IsStudent(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == "STUDENT"
+            and request.user.role == "student"
             and request.user.status == "ACTIVE"
         )
 
@@ -19,7 +19,7 @@ class IsCompany(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == "COMPANY"
+            and request.user.role == "company"
             and request.user.status == "ACTIVE"
         )
 
@@ -30,7 +30,7 @@ class IsAdmin(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == "ADMIN"
+            and request.user.role == "admin"
         )
 
 class IsApplicationOwner(BasePermission):
@@ -44,7 +44,7 @@ class IsOfferOwnerOrAdmin(BasePermission):
     message = "Only the offer owner or an admin can perform this action."
 
     def has_object_permission(self, request, view, obj):
-        if request.user.role == "ADMIN":
+        if request.user.role == "admin":
             return True
         # obj is an Application — check its offer's owner
         return obj.offer.created_by == request.user

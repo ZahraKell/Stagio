@@ -2,6 +2,12 @@ from django.db import models
 from users.models import Company
 
 class InternshipOffer(models.Model):
+    INTERNSHIP_TYPE_CHOICES = (
+        ('INTERNSHIP', 'Stage professionnel'),
+        ('ALTERNANCE', 'Contrat en alternance'),
+        ('FINAL_YEAR', 'Projet de Fin d\'Études (PFE)'),
+    ) 
+        
     STATUS_CHOICES = (
         ('open', 'Open'),
         ('closed', 'Closed'),
@@ -17,6 +23,10 @@ class InternshipOffer(models.Model):
     start_date = models.DateField(blank=True, null=True)
     end_date = models.DateField(blank=True, null=True)
     duration = models.CharField(max_length=50, blank=True, null=True)
-
+    internship_type  = models.CharField(max_length=20, choices=INTERNSHIP_TYPE_CHOICES, default='INTERNSHIP')
+    is_paid          = models.BooleanField(default=False)
+    salary           = models.CharField(max_length=100, blank=True, null=True)
+    field            = models.CharField(max_length=100, blank=True, null=True)
+    skills           = models.TextField(blank=True, null=True)
     def __str__(self):
         return f"{self.title} - {self.company.user.full_name}"

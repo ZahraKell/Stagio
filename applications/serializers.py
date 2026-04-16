@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Application
-from django.utils import timezone
+
 class ApplicationListSerializer(serializers.ModelSerializer):
     offer_title = serializers.CharField(source="offer.title", read_only=True)
     offer_location = serializers.CharField(source="offer.town", read_only=True)
@@ -63,7 +63,7 @@ class ApplicationWriteSerializer(serializers.ModelSerializer):
 class ApplicationReviewSerializer(serializers.Serializer):
 
     status = serializers.ChoiceField(
-        choices=["pending", "accepted", "refused"]
+        choices=["reviewed", "accepted", "refused"]
     )
 
     def validate_status(self, value):

@@ -1,23 +1,20 @@
 from django.db import models
 
-
 class Convention(models.Model):
 
-    STATUS_CHOICES = [
-    ('DRAFT',            'Draft'),
-    ('PENDING_STUDENT',  'Pending Student Signature'),
-    ('PENDING_COMPANY',  'Pending Company Signature'),
-    ('PENDING_ADMIN',    'Pending Admin Validation'),
-    ('VALIDATED',        'Validated'),
-    ('REJECTED',         'Rejected'),
-   ]
+    class Status(models.TextChoices):
+        DRAFT           = 'DRAFT',           'Draft'
+        PENDING_STUDENT = 'PENDING_STUDENT', 'Pending Student Signature'
+        PENDING_COMPANY = 'PENDING_COMPANY', 'Pending Company Signature'
+        PENDING_ADMIN   = 'PENDING_ADMIN',   'Pending Admin Validation'
+        VALIDATED       = 'VALIDATED',       'Validated'
+        REJECTED        = 'REJECTED',        'Rejected'
 
     application = models.ForeignKey(
         'applications.Application',
         on_delete=models.CASCADE,
         related_name='conventions',
     )
-
     administration = models.ForeignKey(
         'users.Administration',
         on_delete=models.SET_NULL,
@@ -26,29 +23,17 @@ class Convention(models.Model):
         related_name='conventions',
     )
 
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default='PENDING',
-    )
-
-    # Internship period
+    status     = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     start_date = models.DateField(null=True, blank=True)
     end_date   = models.DateField(null=True, blank=True)
 
-    # Signature timestamps
     student_signed_at = models.DateTimeField(null=True, blank=True)
     company_signed_at = models.DateTimeField(null=True, blank=True)
     admin_signed_at   = models.DateTimeField(null=True, blank=True)
 
-    # Generated PDF file path
-    pdf_file = models.FileField(
-        upload_to='conventions/pdfs/',
-        null=True,
-        blank=True,
-    )
+    pdf_file = models.FileField(upload_to='conventions/pdfs/', null=True, blank=True)
 
-    # Legacy fields (kept for compatibility)
+    # kept for reference
     agreement_date    = models.DateField(null=True, blank=True)
     student_agreement = models.BooleanField(default=False)
     company_agreement = models.BooleanField(default=False)

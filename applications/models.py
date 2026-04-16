@@ -3,17 +3,19 @@ from users.models import Student
 from offers.models import InternshipOffer
 
 class Application(models.Model):
-    STATUS_CHOICES = (
-        ('pending', 'Pending'),
-        ('accepted', 'Accepted'),
-        ('refused', 'Refused'),
-        ('validated', 'Validated'),
-    )
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='applications')
-    offer = models.ForeignKey(InternshipOffer, on_delete=models.CASCADE, related_name='applications')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    class Status(models.TextChoices):
+        PENDING  = 'pending',  'Pending'
+        REVIEWED = 'reviewed', 'Reviewed'
+        ACCEPTED = 'accepted', 'Accepted'
+        REFUSED  = 'refused',  'Refused'
+        VALIDATED = 'validated', 'Validated'
+
+    student          = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='applications')
+    offer            = models.ForeignKey(InternshipOffer, on_delete=models.CASCADE, related_name='applications')
+    status           = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     application_date = models.DateTimeField(auto_now_add=True)
-    cover_letter = models.TextField(blank=True, null=True)
+    cover_letter     = models.TextField(blank=True, null=True)
 
     class Meta:
         unique_together = ('student', 'offer')

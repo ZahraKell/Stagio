@@ -6,11 +6,9 @@ from rest_framework.response import Response
 from .models import Application
 from notifications.models import Notification
 
-from rest_framework.views       import APIView # type: ignore
-from rest_framework.response    import Response # type: ignore
+from rest_framework.views       import APIView # type: ignore 
 from rest_framework             import status # type: ignore
 from rest_framework.permissions import IsAuthenticated # type: ignore
-from django.shortcuts           import get_object_or_404 # type: ignore
 from django.db                  import IntegrityError   # type: ignore
 from .serializers  import (
     ApplicationListSerializer,
@@ -50,7 +48,7 @@ class ApplicationListCreateView(APIView):
 
         try:
             application = serializer.save(
-                student=request.user,
+                student=request.user.student,
                 status=Application.Status.PENDING,
             )
         except IntegrityError:
@@ -78,11 +76,11 @@ class MyApplicationsView(APIView):
         filter_status = request.query_params.get("status")
 
         applications = Application.objects.filter(
-            student=request.user
-        ).select_related("offer", "offer__created_by").order_by("-created_at")
+            student=request.user.student
+        ).select_related("offer", "offer__company").order_by("-application_date")
 
         if filter_status:
-            applications = applications.filter(status=filter_status.upper())
+            applications = applications.filter(status=filter_status.lower())
 
         serializer = ApplicationListSerializer(applications, many=True)
         return ok(data=serializer.data)
@@ -95,7 +93,7 @@ class ApplicationDetailView(APIView):
     def get_object(self, pk):
         return get_object_or_404(
             Application.objects.select_related(
-                "student", "offer", "offer__created_by"
+                "student", "offer", "offer__company"
             ),
             pk=pk,
         )
@@ -106,8 +104,8 @@ class ApplicationDetailView(APIView):
         # Access control — student sees own, company sees theirs, admin sees all
         user = request.user
         is_owner   = (application.student == user)
-        is_company = (user.role == "COMPANY" and application.offer.created_by == user)
-        is_admin   = (user.role == "ADMIN")
+        is_company = (user.role == "company" and application.offer.created_by == user)
+        is_admin   = (user.role == "admin")
 
         if not (is_owner or is_company or is_admin):
             return fail("You do not have permission to view this application.", status.HTTP_403_FORBIDDEN)
@@ -168,13 +166,13 @@ class OfferApplicationsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, offer_id):
-        from offers.models import Offer   # local import to avoid circular imports
+        from offers.models import InternshipOffer  # local import to avoid circular imports
 
-        offer = get_object_or_404(Offer, pk=offer_id)
+        offer = get_object_or_404(InternshipOffer, pk=offer_id)
 
         # Only the company that owns the offer, or admin, can see applicants
         user = request.user
-        if not (user.role == "ADMIN" or offer.created_by == user):
+        if not (user.role == "admin" or offer.company.user == user):
             return fail(
                 "Only the offer owner or an admin can view applicants.",
                 status.HTTP_403_FORBIDDEN,
@@ -183,10 +181,10 @@ class OfferApplicationsView(APIView):
         filter_status = request.query_params.get("status")
         applications  = Application.objects.filter(
             offer=offer
-        ).select_related("student", "offer").order_by("-created_at")
+        ).select_related("student", "offer").order_by("-application_date")
 
         if filter_status:
-            applications = applications.filter(status=filter_status.upper())
+            applications = applications.filter(status=filter_status.lower())
 
         serializer = ApplicationListSerializer(applications, many=True)
         return ok(
@@ -205,7 +203,7 @@ class ReviewApplicationView(APIView):
 
     def patch(self, request, pk):
         application = get_object_or_404(
-            Application.objects.select_related("offer", "offer__created_by"),
+            Application.objects.select_related("offer", "offer__company"),
             pk=pk,
         )
 
@@ -236,7 +234,7 @@ class ReviewApplicationView(APIView):
         messages = {
             Application.Status.REVIEWED: "Application marked as under review.",
             Application.Status.ACCEPTED: "Application accepted. A convention will be created.",
-            Application.Status.REJECTED: "Application rejected.",
+            Application.Status.REFUSED: "Application rejected.",
         }
 
         return ok(
@@ -254,11 +252,11 @@ class AdminAllApplicationsView(APIView):
         filter_offer_id = request.query_params.get("offer_id")
 
         applications = Application.objects.select_related(
-            "student", "offer", "offer__created_by"
-        ).order_by("-created_at")
+            "student", "offer", "offer__company"
+        ).order_by("-application_date")
 
         if filter_status:
-            applications = applications.filter(status=filter_status.upper())
+            applications = applications.filter(status=filter_status.lower())
 
         if filter_offer_id:
             applications = applications.filter(offer_id=filter_offer_id)
@@ -277,7 +275,7 @@ def pending_validation_list(request):
         return Response({'error': 'Administration only.'}, status=403)
     
     applications = Application.objects.filter(
-        status='accepted'
+        status=Application.Status.ACCEPTED
     ).select_related(
         'student__user',
         'offer__company__user',
@@ -324,7 +322,7 @@ def validate_internship(request, pk):
         )
 
   
-    application.status = 'validated'
+    application.status = Application.Status.VALIDATED
     application.save(update_fields=['status'])
 
     # Notify the student
@@ -372,7 +370,7 @@ def reject_internship(request, pk):
     )
 
    
-    if application.status != 'accepted':
+    if application.status != Application.Status.ACCEPTED:
         return Response(
             {'error': f"Cannot reject. Current status is '{application.status}'. Must be 'accepted' first."},
             status=400
@@ -382,7 +380,7 @@ def reject_internship(request, pk):
     reason = request.data.get('reason', 'No reason provided.')
 
     
-    application.status = 'pending'
+    application.status = Application.Status.PENDING
     application.save(update_fields=['status'])
 
     # Notify the student
