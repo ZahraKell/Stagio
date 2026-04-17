@@ -179,11 +179,20 @@ def filter_offers(request):
   
     town = request.query_params.get('town')
     tech = request.query_params.get('tech')
-
+    internship_type = request.query_params.get('type')
+    field = request.query_params.get('field')
+    
     if town:
         offers = offers.filter(town__icontains=town)
     if tech:
         offers = offers.filter(tech_stack__icontains=tech)
+    if internship_type:
+     
+        offers = offers.filter(internship_type=internship_type.upper())
+ 
+    if field:
+        offers = offers.filter(field__icontains=field)
+
 
     serializer = OfferSerializer(offers, many=True)
     return Response(serializer.data)

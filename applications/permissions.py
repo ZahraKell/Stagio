@@ -9,7 +9,7 @@ class IsStudent(BasePermission):
             request.user
             and request.user.is_authenticated
             and request.user.role == "student"
-            and request.user.status == "ACTIVE"
+            
         )
 
 class IsCompany(BasePermission):
@@ -20,7 +20,7 @@ class IsCompany(BasePermission):
             request.user
             and request.user.is_authenticated
             and request.user.role == "company"
-            and request.user.status == "ACTIVE"
+            
         )
 
 class IsAdmin(BasePermission):
