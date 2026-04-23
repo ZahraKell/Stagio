@@ -25,9 +25,8 @@ INSTALLED_APPS = [
     # My apps
     'users',
     'offers',
-    'applications',
+    'applications.apps.ApplicationsConfig',
     'conventions',
-    'documents',
     'notifications',
     
 ]

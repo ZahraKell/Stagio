@@ -1,24 +1,23 @@
-from django.db.models.signals import post_save # type: ignore
-from django.dispatch          import receiver # type: ignore
+from django.db.models.signals import post_save
+from django.dispatch          import receiver
 from .models import Application
+
 
 @receiver(post_save, sender=Application)
 def create_convention_on_accept(sender, instance, created, **kwargs):
- # Only act on updates (not on initial creation)
+    """
+    Automatically creates a Convention when an application is accepted.
+    The convention starts in PENDING_STUDENT status — waiting for student signature.
+    """
     if created:
-        return
-    # Only act when status is ACCEPTED
+        return   # only act on status changes, not new applications
     if instance.status != Application.Status.ACCEPTED:
         return
-    # Import here to avoid circular imports
-    # (Convention is in a separate app that imports Application)
-    from conventions.models import Convention # type: ignore
-    # Check if a convention already exists for this application
-    # (hasattr check works because of the OneToOneField related_name="convention")
-    if hasattr(instance, "convention"):
-        return   # Already created — do nothing
-    # Create the convention in DRAFT state
+    from conventions.models import Convention
+    # Prevent creating a duplicate if signal fires more than once
+    if Convention.objects.filter(application=instance).exists():
+        return
     Convention.objects.create(
         application=instance,
-        status=Convention.Status.PENDING_STUDENT,  # First step: awaiting student signature
+        status=Convention.Status.PENDING_STUDENT,
     )

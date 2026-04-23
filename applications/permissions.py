@@ -2,25 +2,27 @@ from rest_framework.permissions import BasePermission # pyright: ignore[reportMi
 
 
 class IsStudent(BasePermission):
-    message = "Only active student accounts can perform this action."
+    # Only authenticated users whose role is 'student' can pass.
+    # NOTE: CustomUser has no 'status' field, so we only check role.
+    message = "Only student accounts can perform this action."
 
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
             and request.user.role == "student"
-            
         )
 
 class IsCompany(BasePermission):
-    message = "Only active company accounts can perform this action."
+    # Only authenticated users whose role is 'company' can pass.
+    # NOTE: CustomUser has no 'status' field, so we only check role.
+    message = "Only company accounts can perform this action."
 
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
             and request.user.role == "company"
-            
         )
 
 class IsAdmin(BasePermission):
@@ -37,7 +39,9 @@ class IsApplicationOwner(BasePermission):
     message = "You do not have permission to access this application."
 
     def has_object_permission(self, request, view, obj):
-        return obj.student == request.user
+        # obj.student is a Student instance; request.user is a CustomUser instance.
+        # We must compare obj.student.user (the CustomUser) to request.user.
+        return obj.student.user == request.user
 
 
 class IsOfferOwnerOrAdmin(BasePermission):
@@ -46,5 +50,7 @@ class IsOfferOwnerOrAdmin(BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.user.role == "admin":
             return True
-        # obj is an Application — check its offer's owner
-        return obj.offer.created_by == request.user
+        # obj is an Application — check that the logged-in user owns the offer.
+        # InternshipOffer has a 'company' FK → Company → user (CustomUser).
+        # There is no 'created_by' field on InternshipOffer, so we go through company.
+        return obj.offer.company.user == request.user
