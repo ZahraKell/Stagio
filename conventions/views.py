@@ -2,6 +2,7 @@ import os
 from django.http              import FileResponse, Http404
 from django.shortcuts         import get_object_or_404
 from django.conf              import settings
+from django.utils             import timezone
 from rest_framework.views     import APIView
 from rest_framework.response  import Response
 from rest_framework           import status
@@ -120,14 +121,14 @@ class ConventionPreviewView(APIView):
 
             # Parties
             "student": {
-                "name":        student.full_name,
-                "email":       student.email,
+                "name":        student.user.full_name,
+                "email":       student.user.email,
                 "institution": student.institution,
                 "grade":       student.grade,
             },
             "company": {
-                "name":   company.company_name or company.full_name,
-                "email":  company.email,
+                "name":   company.company_name or company.user.full_name,
+                "email":  company.user.email,
                 "sector": company.company_sector,
             },
 
@@ -159,3 +160,95 @@ class ConventionPreviewView(APIView):
             "pdf_available":    bool(convention.pdf_file),
             "pdf_download_url": f"/api/conventions/{convention.pk}/download/",
         })
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  VIEW 3 — SIGN / VALIDATE A CONVENTION
+class SignConventionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        convention = get_object_or_404(
+            Convention.objects.select_related(
+                "application",
+                "application__student__user",
+                "application__offer__company__user",
+            ),
+            pk=pk,
+        )
+
+        user = request.user
+        now  = timezone.now()    # current timestamp — used for signed_at fields
+
+        # ── STUDENT SIGNS ─────────────────────────────────────────────────────
+        if user.role == 'student':
+            # Security: make sure this student owns this convention
+            if convention.application.student.user != user:
+                return fail("This is not your convention.", status.HTTP_403_FORBIDDEN)
+
+            if convention.status != Convention.Status.PENDING_STUDENT:
+                return fail(
+                    f"Cannot sign now. Current status is '{convention.status}'. "
+                    f"Expected: '{Convention.Status.PENDING_STUDENT}'.",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+            convention.student_signed_at = now
+            convention.status = Convention.Status.PENDING_COMPANY   # advance to next step
+            convention.save(update_fields=['student_signed_at', 'status'])
+
+            return ok(message="Convention signed by student. Waiting for company signature.")
+
+        # ── COMPANY SIGNS ─────────────────────────────────────────────────────
+        elif user.role == 'company':
+            if convention.application.offer.company.user != user:
+                return fail("This is not your convention.", status.HTTP_403_FORBIDDEN)
+
+            if convention.status != Convention.Status.PENDING_COMPANY:
+                return fail(
+                    f"Cannot sign now. Current status is '{convention.status}'. "
+                    f"Expected: '{Convention.Status.PENDING_COMPANY}'.",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+            convention.company_signed_at = now
+            convention.status = Convention.Status.PENDING_ADMIN     # advance to next step
+            convention.save(update_fields=['company_signed_at', 'status'])
+
+            return ok(message="Convention signed by company. Waiting for administration validation.")
+
+        # ── ADMINISTRATION / ADMIN VALIDATES ──────────────────────────────────
+        elif user.role in ['admin', 'administration']:
+            if convention.status != Convention.Status.PENDING_ADMIN:
+                return fail(
+                    f"Cannot validate now. Current status is '{convention.status}'. "
+                    f"Expected: '{Convention.Status.PENDING_ADMIN}'.",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+            convention.admin_signed_at = now
+            convention.status = Convention.Status.VALIDATED          # final step
+            convention.save(update_fields=['admin_signed_at', 'status'])
+
+            # Notify both parties that the convention is fully validated
+            from notifications.models import Notification
+
+            Notification.objects.create(
+                recipient=convention.application.student.user,
+                message=(
+                    f"Votre convention de stage CONV-{convention.pk:04d} "
+                    f"a été validée par l'administration. "
+                    f"Vous pouvez la télécharger depuis la plateforme."
+                )
+            )
+            Notification.objects.create(
+                recipient=convention.application.offer.company.user,
+                message=(
+                    f"La convention de stage CONV-{convention.pk:04d} "
+                    f"a été validée par l'administration universitaire."
+                )
+            )
+
+            return ok(message="Convention fully validated. Both parties have been notified.")
+
+        else:
+            return fail("You are not allowed to sign conventions.", status.HTTP_403_FORBIDDEN)
