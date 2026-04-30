@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    // 1. Change the target
+    "target": "ES2020",
+    // 2. Change the module resolution
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // 3. Additional standard settings
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
