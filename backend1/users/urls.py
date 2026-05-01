@@ -12,6 +12,8 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view()),
     path('logout/',        views.logout),
     path('auth/google/', views.google_login),
+    path('forgot-password/', views.forgot_password),
+    path('reset-password/',  views.reset_password),
 
     # ── Profile (GET + PATCH for all roles) ───────────────────────────────────
     path('profile/',        profile_views.get_profile),

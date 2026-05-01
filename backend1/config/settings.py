@@ -10,6 +10,11 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', cast=bool)
 ALLOWED_HOSTS = []
 
+AUTHENTICATION_BACKENDS = [
+    'users.backends.EmailOrUsernameBackend',
+    'django.contrib.auth.backends.ModelBackend',  # keep as fallback
+]
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',

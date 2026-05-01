@@ -1,60 +1,65 @@
 // src/pages/company/MyInterns.tsx
 import { useState, useEffect } from "react";
-import CompanyLayout from "./components/CompanyLayout";
+import CompanyLayout from "../components/CompanyLayout";
 
 // ── TYPES ──────────────────────────────────────────────────
 interface Intern {
-  application_id:    number;
-  student_name:      string;
-  student_email:     string;
-  offer_title:       string;
-  application_date:  string;
-  stage:             "convention_to_sign" | "convention_pending" | "ongoing" | "completed" | "pending_convention";
-  convention_id:     number | null;
+  application_id: number;
+  student_name: string;
+  student_email: string;
+  offer_title: string;
+  application_date: string;
+  stage:
+    | "convention_to_sign"
+    | "convention_pending"
+    | "ongoing"
+    | "completed"
+    | "pending_convention";
+  convention_id: number | null;
   convention_status: string | null;
 }
 
 // ── STAGE CONFIG ───────────────────────────────────────────
 const STAGE_CONFIG = {
   pending_convention: {
-    label:   "En attente",
-    color:   "#f59e0b",
-    bg:      "#fffbeb",
-    border:  "#fde68a",
-    icon:    "⏳",
-    desc:    "Convention pas encore générée",
+    label: "En attente",
+    color: "#f59e0b",
+    bg: "#fffbeb",
+    border: "#fde68a",
+    icon: "⏳",
+    desc: "Convention pas encore générée",
   },
   convention_to_sign: {
-    label:   "Convention à signer",
-    color:   "#3b82f6",
-    bg:      "#eff6ff",
-    border:  "#bfdbfe",
-    icon:    "✍️",
-    desc:    "En attente de votre signature",
+    label: "Convention à signer",
+    color: "#3b82f6",
+    bg: "#eff6ff",
+    border: "#bfdbfe",
+    icon: "✍️",
+    desc: "En attente de votre signature",
   },
   convention_pending: {
-    label:   "Convention en cours",
-    color:   "#8b5cf6",
-    bg:      "#f5f3ff",
-    border:  "#ddd6fe",
-    icon:    "📄",
-    desc:    "En attente de validation",
+    label: "Convention en cours",
+    color: "#8b5cf6",
+    bg: "#f5f3ff",
+    border: "#ddd6fe",
+    icon: "📄",
+    desc: "En attente de validation",
   },
   ongoing: {
-    label:   "Stage en cours",
-    color:   "#22c55e",
-    bg:      "#f0fdf4",
-    border:  "#bbf7d0",
-    icon:    "🎓",
-    desc:    "Stagiaire actif",
+    label: "Stage en cours",
+    color: "#22c55e",
+    bg: "#f0fdf4",
+    border: "#bbf7d0",
+    icon: "🎓",
+    desc: "Stagiaire actif",
   },
   completed: {
-    label:   "Terminé",
-    color:   "#64748b",
-    bg:      "#f8fafc",
-    border:  "#e2e8f0",
-    icon:    "✅",
-    desc:    "Stage terminé",
+    label: "Terminé",
+    color: "#64748b",
+    bg: "#f8fafc",
+    border: "#e2e8f0",
+    icon: "✅",
+    desc: "Stage terminé",
   },
 };
 
@@ -63,8 +68,8 @@ function InternCard({
   intern,
   onSignConvention,
 }: {
-  intern:            Intern;
-  onSignConvention:  (intern: Intern) => void;
+  intern: Intern;
+  onSignConvention: (intern: Intern) => void;
 }) {
   const cfg = STAGE_CONFIG[intern.stage] ?? STAGE_CONFIG.pending_convention;
   const initial = intern.student_name.charAt(0).toUpperCase();
@@ -72,18 +77,19 @@ function InternCard({
   return (
     <div
       className="mi-card"
-      style={{
-        "--stage-color":  cfg.color,
-        "--stage-bg":     cfg.bg,
-        "--stage-border": cfg.border,
-      } as React.CSSProperties}
+      style={
+        {
+          "--stage-color": cfg.color,
+          "--stage-bg": cfg.bg,
+          "--stage-border": cfg.border,
+        } as React.CSSProperties
+      }
     >
       {/* Stage indicator stripe */}
       <div className="mi-card-stripe" />
 
       {/* Card content */}
       <div className="mi-card-body">
-
         {/* Student identity */}
         <div className="mi-student-row">
           <div className="mi-avatar">{initial}</div>
@@ -99,24 +105,52 @@ function InternCard({
 
         {/* Offer info */}
         <div className="mi-offer-row">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <rect x="2" y="7" width="20" height="14" rx="2" />
+            <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
+          </svg>
           <span>{intern.offer_title}</span>
         </div>
 
         {/* Convention status */}
         {intern.convention_status && (
           <div className="mi-conv-status">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <span>Convention : {intern.convention_status.replace("_", " ").toLowerCase()}</span>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            <span>
+              Convention :{" "}
+              {intern.convention_status.replace("_", " ").toLowerCase()}
+            </span>
           </div>
         )}
 
         {/* Date */}
         <div className="mi-date-row">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
           <span>Candidature acceptée le {intern.application_date}</span>
         </div>
-
       </div>
 
       {/* Card footer — action */}
@@ -141,9 +175,7 @@ function InternCard({
           </div>
         )}
         {intern.stage === "completed" && (
-          <div className="mi-done-msg">
-            ✅ Stage terminé avec succès
-          </div>
+          <div className="mi-done-msg">✅ Stage terminé avec succès</div>
         )}
         {intern.stage === "pending_convention" && (
           <div className="mi-waiting-msg">
@@ -162,15 +194,15 @@ function ConventionPopup({
   onClose,
   onSigned,
 }: {
-  intern:   Intern;
-  onClose:  () => void;
+  intern: Intern;
+  onClose: () => void;
   onSigned: () => void;
 }) {
-  const token   = localStorage.getItem("access_token");
+  const token = localStorage.getItem("access_token");
   const [signing, setSigning] = useState(false);
-  const [agreed,  setAgreed]  = useState(false);
-  const [error,   setError]   = useState("");
-  const [done,    setDone]    = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
 
   const handleSign = async () => {
     if (!agreed) return;
@@ -180,9 +212,9 @@ function ConventionPopup({
       const res = await fetch(
         `http://127.0.0.1:8000/api/conventions/${intern.convention_id}/sign/`,
         {
-          method:  "POST",
+          method: "POST",
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       if (!res.ok) throw new Error("Erreur lors de la signature.");
       setDone(true);
@@ -194,9 +226,13 @@ function ConventionPopup({
   };
 
   return (
-    <div className="conv-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      className="conv-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="conv-popup">
-
         {/* Header */}
         <div className="conv-head">
           <div className="conv-head-icon">📋</div>
@@ -205,7 +241,9 @@ function ConventionPopup({
             <p>CONV-{String(intern.convention_id).padStart(4, "0")}</p>
           </div>
           {!done && (
-            <button className="conv-close" onClick={onClose}>✕</button>
+            <button className="conv-close" onClick={onClose}>
+              ✕
+            </button>
           )}
         </div>
 
@@ -215,8 +253,8 @@ function ConventionPopup({
             <div className="conv-success-icon">✅</div>
             <h3>Convention signée !</h3>
             <p>
-              Votre signature a été enregistrée. La convention sera
-              transmise à l'administration universitaire pour validation finale.
+              Votre signature a été enregistrée. La convention sera transmise à
+              l'administration universitaire pour validation finale.
             </p>
           </div>
         ) : (
@@ -234,7 +272,9 @@ function ConventionPopup({
                 </div>
                 <div className="conv-summary-item">
                   <span>Réf. Convention</span>
-                  <strong>CONV-{String(intern.convention_id).padStart(4, "0")}</strong>
+                  <strong>
+                    CONV-{String(intern.convention_id).padStart(4, "0")}
+                  </strong>
                 </div>
               </div>
 
@@ -242,11 +282,11 @@ function ConventionPopup({
               <div className="conv-explainer">
                 <div className="conv-explainer-icon">ℹ️</div>
                 <p>
-                  En signant cette convention, vous confirmez en tant que représentant
-                  de l'entreprise que vous acceptez d'accueillir{" "}
-                  <strong>{intern.student_name}</strong> pour un stage portant sur le
-                  poste <strong>« {intern.offer_title} »</strong>.
-                  Cette signature électronique a valeur juridique équivalente à une
+                  En signant cette convention, vous confirmez en tant que
+                  représentant de l'entreprise que vous acceptez d'accueillir{" "}
+                  <strong>{intern.student_name}</strong> pour un stage portant
+                  sur le poste <strong>« {intern.offer_title} »</strong>. Cette
+                  signature électronique a valeur juridique équivalente à une
                   signature manuscrite.
                 </p>
               </div>
@@ -274,12 +314,12 @@ function ConventionPopup({
                 <input
                   type="checkbox"
                   checked={agreed}
-                  onChange={e => setAgreed(e.target.checked)}
+                  onChange={(e) => setAgreed(e.target.checked)}
                 />
                 <span className="conv-check-box" />
                 <span>
-                  Je certifie avoir lu la convention et j'accepte ses termes
-                  en tant que représentant légal de l'entreprise.
+                  Je certifie avoir lu la convention et j'accepte ses termes en
+                  tant que représentant légal de l'entreprise.
                 </span>
               </label>
 
@@ -299,13 +339,12 @@ function ConventionPopup({
                 {signing
                   ? "Signature en cours…"
                   : agreed
-                  ? "✍️  Je signe la convention"
-                  : "Cochez la case pour signer"}
+                    ? "✍️  Je signe la convention"
+                    : "Cochez la case pour signer"}
               </button>
             </div>
           </>
         )}
-
       </div>
     </div>
   );
@@ -315,53 +354,111 @@ function ConventionPopup({
 export default function MyInterns() {
   const token = localStorage.getItem("access_token");
 
-  const [interns,    setInterns]    = useState<Intern[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [activeTab,  setActiveTab]  = useState<"all" | "convention_to_sign" | "ongoing" | "completed">("all");
+  const [interns, setInterns] = useState<Intern[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<
+    "all" | "convention_to_sign" | "ongoing" | "completed"
+  >("all");
   const [signTarget, setSignTarget] = useState<Intern | null>(null);
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/applications/my-interns/", {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(r => r.json())
-      .then(d => {
+      .then((r) => r.json())
+      .then((d) => {
         if (!d.error && d.data) setInterns(d.data);
         else throw new Error();
       })
       .catch(() => {
         // Mock data
         setInterns([
-          { application_id: 1, student_name: "Sara Meziane",  student_email: "sara.m@usthb.edu.dz",   offer_title: "Data Analyst",         application_date: "2026-04-20", stage: "convention_to_sign", convention_id: 1,    convention_status: "PENDING_COMPANY" },
-          { application_id: 2, student_name: "Youcef Ould",   student_email: "y.ould@esi.edu.dz",      offer_title: "Développeur Django",    application_date: "2026-04-18", stage: "ongoing",            convention_id: 2,    convention_status: "VALIDATED"       },
-          { application_id: 3, student_name: "Meriem Aït",    student_email: "m.ait@ummto.edu.dz",     offer_title: "Développeur React",     application_date: "2026-04-15", stage: "convention_pending", convention_id: 3,    convention_status: "PENDING_ADMIN"   },
-          { application_id: 4, student_name: "Riad Khelifi",  student_email: "r.khelifi@esi.edu.dz",   offer_title: "Data Analyst",         application_date: "2026-03-10", stage: "completed",          convention_id: 4,    convention_status: "VALIDATED"       },
-          { application_id: 5, student_name: "Loubna Hamza",  student_email: "l.hamza@usthb.edu.dz",   offer_title: "Développeur Django",    application_date: "2026-04-22", stage: "pending_convention", convention_id: null, convention_status: "PENDING_STUDENT" },
+          {
+            application_id: 1,
+            student_name: "Sara Meziane",
+            student_email: "sara.m@usthb.edu.dz",
+            offer_title: "Data Analyst",
+            application_date: "2026-04-20",
+            stage: "convention_to_sign",
+            convention_id: 1,
+            convention_status: "PENDING_COMPANY",
+          },
+          {
+            application_id: 2,
+            student_name: "Youcef Ould",
+            student_email: "y.ould@esi.edu.dz",
+            offer_title: "Développeur Django",
+            application_date: "2026-04-18",
+            stage: "ongoing",
+            convention_id: 2,
+            convention_status: "VALIDATED",
+          },
+          {
+            application_id: 3,
+            student_name: "Meriem Aït",
+            student_email: "m.ait@ummto.edu.dz",
+            offer_title: "Développeur React",
+            application_date: "2026-04-15",
+            stage: "convention_pending",
+            convention_id: 3,
+            convention_status: "PENDING_ADMIN",
+          },
+          {
+            application_id: 4,
+            student_name: "Riad Khelifi",
+            student_email: "r.khelifi@esi.edu.dz",
+            offer_title: "Data Analyst",
+            application_date: "2026-03-10",
+            stage: "completed",
+            convention_id: 4,
+            convention_status: "VALIDATED",
+          },
+          {
+            application_id: 5,
+            student_name: "Loubna Hamza",
+            student_email: "l.hamza@usthb.edu.dz",
+            offer_title: "Développeur Django",
+            application_date: "2026-04-22",
+            stage: "pending_convention",
+            convention_id: null,
+            convention_status: "PENDING_STUDENT",
+          },
         ]);
       })
       .finally(() => setLoading(false));
   }, [token]);
 
-  const filtered = activeTab === "all"
-    ? interns
-    : interns.filter(i => i.stage === activeTab ||
-        (activeTab === "ongoing" && i.stage === "convention_pending"));
+  const filtered =
+    activeTab === "all"
+      ? interns
+      : interns.filter(
+          (i) =>
+            i.stage === activeTab ||
+            (activeTab === "ongoing" && i.stage === "convention_pending"),
+        );
 
   const counts = {
-    all:              interns.length,
-    convention_to_sign: interns.filter(i => i.stage === "convention_to_sign").length,
-    ongoing:          interns.filter(i => i.stage === "ongoing" || i.stage === "convention_pending").length,
-    completed:        interns.filter(i => i.stage === "completed").length,
+    all: interns.length,
+    convention_to_sign: interns.filter((i) => i.stage === "convention_to_sign")
+      .length,
+    ongoing: interns.filter(
+      (i) => i.stage === "ongoing" || i.stage === "convention_pending",
+    ).length,
+    completed: interns.filter((i) => i.stage === "completed").length,
   };
 
   const handleSigned = () => {
     if (!signTarget) return;
-    setInterns(prev =>
-      prev.map(i =>
+    setInterns((prev) =>
+      prev.map((i) =>
         i.application_id === signTarget.application_id
-          ? { ...i, stage: "convention_pending", convention_status: "PENDING_ADMIN" }
-          : i
-      )
+          ? {
+              ...i,
+              stage: "convention_pending",
+              convention_status: "PENDING_ADMIN",
+            }
+          : i,
+      ),
     );
     setSignTarget(null);
   };
@@ -369,13 +466,13 @@ export default function MyInterns() {
   return (
     <CompanyLayout>
       <div className="mi-root">
-
         {/* Page header */}
         <div className="mi-page-header">
           <div>
             <h2 className="mi-page-title">Mes Stagiaires</h2>
             <p className="mi-page-sub">
-              Suivez l'avancement de vos stages — de la convention à l'attestation
+              Suivez l'avancement de vos stages — de la convention à
+              l'attestation
             </p>
           </div>
 
@@ -383,7 +480,8 @@ export default function MyInterns() {
           {counts.convention_to_sign > 0 && (
             <div className="mi-urgent-badge">
               <span>✍️</span>
-              {counts.convention_to_sign} convention{counts.convention_to_sign > 1 ? "s" : ""} à signer
+              {counts.convention_to_sign} convention
+              {counts.convention_to_sign > 1 ? "s" : ""} à signer
             </div>
           )}
         </div>
@@ -391,12 +489,36 @@ export default function MyInterns() {
         {/* Stats row */}
         <div className="mi-stats-row">
           {[
-            { label: "Total",            val: interns.length,            icon: "👥", color: "#3b82f6" },
-            { label: "À signer",         val: counts.convention_to_sign, icon: "✍️", color: "#f59e0b" },
-            { label: "En cours",         val: counts.ongoing,            icon: "🎓", color: "#22c55e" },
-            { label: "Terminés",         val: counts.completed,          icon: "✅", color: "#64748b" },
-          ].map(s => (
-            <div key={s.label} className="mi-stat" style={{ "--stat-color": s.color } as React.CSSProperties}>
+            {
+              label: "Total",
+              val: interns.length,
+              icon: "👥",
+              color: "#3b82f6",
+            },
+            {
+              label: "À signer",
+              val: counts.convention_to_sign,
+              icon: "✍️",
+              color: "#f59e0b",
+            },
+            {
+              label: "En cours",
+              val: counts.ongoing,
+              icon: "🎓",
+              color: "#22c55e",
+            },
+            {
+              label: "Terminés",
+              val: counts.completed,
+              icon: "✅",
+              color: "#64748b",
+            },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className="mi-stat"
+              style={{ "--stat-color": s.color } as React.CSSProperties}
+            >
               <span className="mi-stat-icon">{s.icon}</span>
               <strong className="mi-stat-val">{s.val}</strong>
               <span className="mi-stat-label">{s.label}</span>
@@ -407,17 +529,41 @@ export default function MyInterns() {
         {/* Pipeline flow diagram */}
         <div className="mi-pipeline">
           {[
-            { stage: "convention_to_sign", icon: "✍️", label: "Convention\nà signer",  count: interns.filter(i => i.stage === "convention_to_sign").length },
-            { stage: "convention_pending", icon: "📄", label: "Convention\nen attente", count: interns.filter(i => i.stage === "convention_pending").length },
-            { stage: "ongoing",            icon: "🎓", label: "Stage\nen cours",       count: interns.filter(i => i.stage === "ongoing").length },
-            { stage: "completed",          icon: "🏆", label: "Stage\nterminé",        count: interns.filter(i => i.stage === "completed").length },
+            {
+              stage: "convention_to_sign",
+              icon: "✍️",
+              label: "Convention\nà signer",
+              count: interns.filter((i) => i.stage === "convention_to_sign")
+                .length,
+            },
+            {
+              stage: "convention_pending",
+              icon: "📄",
+              label: "Convention\nen attente",
+              count: interns.filter((i) => i.stage === "convention_pending")
+                .length,
+            },
+            {
+              stage: "ongoing",
+              icon: "🎓",
+              label: "Stage\nen cours",
+              count: interns.filter((i) => i.stage === "ongoing").length,
+            },
+            {
+              stage: "completed",
+              icon: "🏆",
+              label: "Stage\nterminé",
+              count: interns.filter((i) => i.stage === "completed").length,
+            },
           ].map((p, i) => (
             <div key={p.stage} className="mi-pipeline-row">
               <div className="mi-pipeline-step">
                 <div className="mi-pipeline-icon">{p.icon}</div>
                 <div className="mi-pipeline-info">
                   <span className="mi-pipeline-label">{p.label}</span>
-                  <strong className="mi-pipeline-count">{p.count} stagiaire{p.count !== 1 ? "s" : ""}</strong>
+                  <strong className="mi-pipeline-count">
+                    {p.count} stagiaire{p.count !== 1 ? "s" : ""}
+                  </strong>
                 </div>
               </div>
               {i < 3 && <div className="mi-pipeline-arrow">→</div>}
@@ -427,12 +573,14 @@ export default function MyInterns() {
 
         {/* Tabs */}
         <div className="mi-tabs">
-          {([
-            ["all",               "Tous",                   counts.all              ],
-            ["convention_to_sign","À signer",               counts.convention_to_sign],
-            ["ongoing",           "En cours",               counts.ongoing           ],
-            ["completed",         "Terminés",               counts.completed         ],
-          ] as const).map(([key, label, count]) => (
+          {(
+            [
+              ["all", "Tous", counts.all],
+              ["convention_to_sign", "À signer", counts.convention_to_sign],
+              ["ongoing", "En cours", counts.ongoing],
+              ["completed", "Terminés", counts.completed],
+            ] as const
+          ).map(([key, label, count]) => (
             <button
               key={key}
               className={`mi-tab ${activeTab === key ? "mi-tab-active" : ""}`}
@@ -473,15 +621,11 @@ export default function MyInterns() {
                 key={intern.application_id}
                 style={{ animationDelay: `${i * 60}ms` }}
               >
-                <InternCard
-                  intern={intern}
-                  onSignConvention={setSignTarget}
-                />
+                <InternCard intern={intern} onSignConvention={setSignTarget} />
               </div>
             ))}
           </div>
         )}
-
       </div>
 
       {/* Convention signing popup */}

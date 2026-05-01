@@ -349,4 +349,103 @@ def google_login(request):
         except Exception:
             pass
 
-    return Response(response_data)       
+    return Response(response_data) 
+
+# ── FORGOT PASSWORD ───────────────────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password(request):
+    """
+    User submits their email.
+    Backend sends a 6-digit OTP code to that email.
+    Body: { "email": "ahmed@esi.edu.dz" }
+    """
+    email = (request.data.get('email') or '').strip().lower()
+    if not email:
+        return Response({'error': 'email is required.'}, status=400)
+
+    # We don't reveal if the email exists or not — security best practice
+    # If email doesn't exist, we still return success to prevent user enumeration
+    try:
+        user = User.objects.get(email__iexact=email)
+        otp = SignupOTP.create_for_user(user, minutes=15)
+        subject = "[Stag.io] Password reset code"
+        message = (
+            f"Hello {user.full_name or user.username},\n\n"
+            f"Your password reset code is: {otp.code}\n"
+            f"It expires in 15 minutes.\n\n"
+            f"If you did not request this, ignore this email.\n"
+            f"L'équipe Stag.io"
+        )
+        try:
+            send_mail(
+                subject, message,
+                getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+                [user.email],
+                fail_silently=True
+            )
+        except Exception:
+            pass
+    except User.DoesNotExist:
+        pass  # Silent — don't tell attacker the email doesn't exist
+
+    return Response({
+        'message': 'If this email exists, a reset code has been sent.'
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password(request):
+    """
+    User submits email + OTP code + new password.
+    Body: {
+        "email": "ahmed@esi.edu.dz",
+        "code": "123456",
+        "new_password": "NewPass123!",
+        "confirm_password": "NewPass123!"
+    }
+    """
+    email            = (request.data.get('email') or '').strip().lower()
+    code             = (request.data.get('code') or '').strip()
+    new_password     = request.data.get('new_password', '')
+    confirm_password = request.data.get('confirm_password', '')
+
+    # Validate all fields present
+    if not email:
+        return Response({'error': 'email is required.'}, status=400)
+    if not code:
+        return Response({'error': 'code is required.'}, status=400)
+    if not new_password:
+        return Response({'error': 'new_password is required.'}, status=400)
+    if new_password != confirm_password:
+        return Response({'error': 'Passwords do not match.'}, status=400)
+    if len(new_password) < 8:
+        return Response({'error': 'Password must be at least 8 characters.'}, status=400)
+
+    # Find user
+    try:
+        user = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        return Response({'error': 'Invalid code or email.'}, status=400)
+
+    # Find valid OTP
+    otp = user.signup_otps.filter(
+        code=code,
+        is_used=False
+    ).order_by('-created_at').first()
+
+    if not otp or not otp.is_valid():
+        return Response({'error': 'Invalid or expired code.'}, status=400)
+
+    # Mark OTP as used
+    otp.is_used = True
+    otp.save(update_fields=['is_used'])
+
+    # Set new password
+    user.set_password(new_password)
+    user.save(update_fields=['password'])
+
+    return Response({'message': 'Password reset successfully. You can now log in.'})
+      

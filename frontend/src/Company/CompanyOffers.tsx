@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import CompanyLayout from "./components/CompanyLayout";
+import CompanyLayout from "../components/CompanyLayout";
 
 // ── TYPES ──────────────────────────────────────────────────
 export interface Offer {

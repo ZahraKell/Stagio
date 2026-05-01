@@ -28,7 +28,15 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
     offer_title = serializers.CharField(source="offer.title", read_only=True)
     offer_company = serializers.CharField(source="offer.company.user.full_name", read_only=True)
     offer_location = serializers.CharField(source="offer.town", read_only=True)
+    convention_id = serializers.SerializerMethodField()
 
+    def get_convention_id(self, obj):
+        # safely returns the convention ID or None if not created yet
+        try:
+            return obj.convention.pk
+        except Exception:
+            return None
+        
     class Meta:
         model = Application
         fields = [
@@ -41,7 +49,9 @@ class ApplicationDetailSerializer(serializers.ModelSerializer):
             "student_email",
             "cover_letter",
             "status",
+            "stage_state",
             "application_date",
+            "convention_id",
         ]
 
 class ApplicationWriteSerializer(serializers.ModelSerializer):

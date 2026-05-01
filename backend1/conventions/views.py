@@ -280,3 +280,34 @@ def pending_admin_conventions(request):
         "updated_at": c.updated_at.isoformat(),
     } for c in qs]
     return ok(data=data, message=f"{len(data)} convention(s) pending administration validation.")
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_conventions(request):
+    """Student gets their own conventions."""
+    if request.user.role != 'student':
+        return fail("Students only.", status.HTTP_403_FORBIDDEN)
+
+    conventions = Convention.objects.filter(
+        application__student=request.user.student
+    ).select_related(
+        'application__offer',
+        'application__offer__company__user',
+        'application__offer__company',
+    ).order_by('-created_at')
+
+    data = [{
+        'id':               c.pk,
+        'status':           c.status,
+        'application_id':   c.application.pk,
+        'offer_title':      c.application.offer.title,
+        'company_name':     c.application.offer.company.company_name or c.application.offer.company.user.full_name,
+        'start_date':       c.start_date.isoformat() if c.start_date else None,
+        'end_date':         c.end_date.isoformat()   if c.end_date   else None,
+        'student_signed':   c.student_signed_at is not None,
+        'company_signed':   c.company_signed_at is not None,
+        'admin_validated':  c.admin_signed_at   is not None,
+        'pdf_download_url': f"/api/conventions/{c.pk}/download/",
+    } for c in conventions]
+
+    return ok(data=data)

@@ -1,3 +1,4 @@
+// src/components/CompanyLayout.tsx
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
@@ -260,8 +261,13 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
               )}
             </div>
 
-            {/* User pill */}
-            <div className="cl-user-pill">
+            {/* User pill — NOW CLICKABLE */}
+            <div
+              className="cl-user-pill"
+              onClick={() => navigate("/company/profile")}
+              style={{ cursor: "pointer" }}
+              title="Voir le profil"
+            >
               <div className="cl-user-av">{initial}</div>
               <span className="cl-user-name">{fullName}</span>
             </div>
