@@ -32,6 +32,9 @@ INSTALLED_APPS = [
     
 ]
 
+# CORS — allow frontend to talk to backend
+CORS_ALLOW_ALL_ORIGINS = True
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  
     'django.middleware.security.SecurityMiddleware',
@@ -115,5 +118,3 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
-# CORS — allow frontend to talk to backend
-CORS_ALLOW_ALL_ORIGINS = True

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import studentImg from "./assets/student.jpg";
 import companyImg from "./assets/company.jpg";
+import block1Img from './assets/block1.png';
 
 const CDN = "https://cdn.sanity.io/images/mz2hls6g/eu-production";
 const IMG = {
@@ -65,9 +66,8 @@ function SplitHero() {
         <div className="hs-panel-body">
           <div className="hs-panel-big-title">Student</div>
           <p className="hs-panel-desc">
-            Here where you can find your dream internship, connect with top companies, and get career advice tailored just for you.
-          </p>
-          <button className="hs-panel-btn">click here →</button>
+            Find internships that match your skills, connect with leading companies, <br />and take the next step in your career with confidence.</p>
+          <button className="hs-panel-btn">Explore opportunities →</button>
         </div>
       </div>
       <div className="hs-panel-divider" />
@@ -84,28 +84,28 @@ function SplitHero() {
       >
         <div className="hs-panel-overlay" />
         <div className="hs-panel-body">
-          <div className="hs-panel-big-title">company</div>
+          <div className="hs-panel-big-title">Company</div> {/* Capitalized */}
           <p className="hs-panel-desc">
-            share your internship opportunities with potential candidates.
+            Publish your internship offers, reach qualified students, <br />and manage applications efficiently from one platform.
           </p>
-          <button className="hs-panel-btn">create internship →</button>
+          <button className="hs-panel-btn">Post an internship →</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ---------- Scroll Color Section (corrected structure) ----------
+// ---------- Scroll Color Section (5 blocks) ----------
 function ScrollColorSection() {
   const [activeBlock, setActiveBlock] = useState(0);
   const blockRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Your custom transition colors (keep as you want)
   const bgColors = [
-    "#b168f1", // Block 1 – soft purple
-    "#f58e56", // Block 2 – warm pink/cream
-    "#7579ff", // Block 3 – soft blue
-    "#feee74", // Block 4 – light orange/yellow
+    "#F5EBD3", // Block 1 — soft cream
+    "#E8D2A8", // Block 2 — warm sand
+    "#C8965E", // Block 3 — honey wood
+    "#B8893E", // Block 4 — vintage gold
+    "#5C1F2E", // Block 5 — deep burgundy
   ];
 
   useEffect(() => {
@@ -129,32 +129,63 @@ function ScrollColorSection() {
   return (
     <section className="scroll-color-section" style={{ backgroundColor: bgColors[activeBlock] }}>
       <div className="scroll-color-container">
+
+        {/* Block 1 — Fixed text and image */}
         <div className="color-block" ref={el => { blockRefs.current[0] = el; }}>
-          <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "36px", fontWeight: 800, marginBottom: "16px" }}>
-            Ton feed, ton avenir
-          </h2>
-          <p style={{ fontSize: "17px", color: "#555", maxWidth: "560px" }}>
-            Découvre du contenu personnalisé, des offres de stages et des conseils de recruteurs — tout en un seul endroit.
-          </p>
-          <div className="simple-image-container">
-            <img src="path/to/your-image.jpg" alt="App preview" className="simple-image" />
+          <div className="split-layout">
+            <div className="split-text">
+              <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "44px", fontWeight: 800, marginBottom: "16px", lineHeight: 1.1 }}>
+                Your career starts here.
+              </h2>
+              <p style={{ fontSize: "20px", fontWeight: 500, color: "#2A1F14", marginBottom: "16px" }}>
+                Turn your studies into concrete professional experience.
+              </p>
+              <p style={{ fontSize: "17px", color: "#5B4A38", maxWidth: "520px", marginBottom: "28px", lineHeight: 1.5 }}>
+                Access internships throughout Algeria, apply quickly and develop your career with leading companies and institutions.</p>
+              <button className="cta-primary">View offers</button>
+            </div>
+            <div className="split-image">
+              {/* Real image – replace with your own asset or CDN */}
+              <img src={block1Img} alt="" style={{ width: "100%", borderRadius: "20px", boxShadow: "0 20px 40px rgba(0,0,0,0.1)" }}
+              />
+
+            </div>
           </div>
         </div>
 
-
-
-        {/* Block 2 – Graduated students (testimonial cards) */}
+        {/* Block 2 — Notre plateforme web */}
         <div className="color-block" ref={el => { blockRefs.current[1] = el; }}>
           <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "36px", fontWeight: 800, marginBottom: "16px" }}>
-            Nos diplômés brillent
+            A complete platform
+          </h2>
+          <div className="side-layout">
+            <div className="side-text">
+              <p>All the tools you need to succeed in your internship search.</p>
+              <ul className="side-features">
+                <li>Recommended offers based on your profile</li>
+                <li>Direct messaging with recruiters</li>
+                <li>Real-time application tracking</li>
+                <li>Real-time application tracking</li>
+              </ul>
+            </div>
+            <div className="side-phone">
+              <img src="src/assets/comments.png" alt="App preview" />
+            </div>
+          </div>
+        </div>
+
+        {/* Block 3 — Graduated students */}
+        <div className="color-block" ref={el => { blockRefs.current[2] = el; }}>
+          <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "36px", fontWeight: 800, marginBottom: "16px" }}>
+            They succeeded with InternChips
           </h2>
           <p style={{ fontSize: "17px", color: "#555", maxWidth: "600px" }}>
-            Ils ont trouvé leur voie grâce à nous. Et vous serez le prochain.
+            Students who turned their internship into a career opportunity.
           </p>
           <div className="testimonial-grid">
             {graduatedStudents.map((student, idx) => (
               <div key={idx} className="testimonial-card">
-                <div className="testimonial-quote">“{student.quote}”</div>
+                <div className="testimonial-quote">"{student.quote}"</div>
                 <div className="testimonial-author">
                   <img src={student.avatar} alt={student.name} className="testimonial-avatar" />
                   <div className="testimonial-info">
@@ -168,36 +199,15 @@ function ScrollColorSection() {
           </div>
         </div>
 
-        {/* Block 3 – Platform web (image placeholder) */}
-        <div className="color-block" ref={el => { blockRefs.current[2] = el; }}>
-          <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "36px", fontWeight: 800, marginBottom: "16px" }}>
-            Notre plateforme web
-          </h2>
-          <div className="side-layout">
-            <div className="side-text">
-              <h3>Une expérience tout-en-un</h3>
-              <p>Accédez à tous les outils nécessaires pour propulser votre carrière depuis votre navigateur.</p>
-              <ul className="side-features">
-                <li>Offres personnalisées basées sur votre profil</li>
-                <li>Messagerie directe avec les recruteurs</li>
-                <li>Calendrier d'événements et webinaires exclusifs</li>
-                <li>Espace CV interactif et suivi des candidatures</li>
-              </ul>
-            </div>
-            <div className="side-phone"><img src="src/assets/comments.png" alt="" />
-            </div>
-          </div>
-        </div>
-
-        {/* Block 4 – Join us (image placeholder) */}
+        {/* Block 4 — Rejoignez l'aventure */}
         <div className="color-block" ref={el => { blockRefs.current[3] = el; }}>
           <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "36px", fontWeight: 800, marginBottom: "16px" }}>
-            Rejoignez l'aventure
+            Access the platform from anywhere
           </h2>
           <div className="side-layout" style={{ flexDirection: "row-reverse" }}>
             <div className="side-text">
-              <h3>Téléchargez l'application</h3>
-              <p>Retrouvez toutes les fonctionnalités de Stag.io sur mobile et ne manquez jamais une opportunité.</p>
+              <h3>Download our application</h3>
+              <p>All the features, directly on your mobile.</p>
               <div className="join-buttons">
                 <a href="#" className="store-btn">
                   <div className="store-icon">📱</div>
@@ -216,10 +226,31 @@ function ScrollColorSection() {
               </div>
             </div>
             <div className="side-phone">
-              <div className="image-placeholder"><img src="src/assets/appmock.png" alt="" /></div>
+              <div className="image-placeholder">
+                <img src="src/assets/appmock.png" alt="Mobile app mockup" />
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Block 5 — Admin / company invitation */}
+        <div className="color-block" ref={el => { blockRefs.current[4] = el; }}>
+          <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "36px", fontWeight: 800, marginBottom: "16px", color: "#fff" }}>
+            Vous êtes une entreprise ou une administration ?
+          </h2>
+          <p style={{ fontSize: "20px", fontWeight: 500, color: "#FFFFFF", marginBottom: "16px", maxWidth: "640px" }}>
+            Trouvez les talents qui feront grandir votre organisation.
+          </p>
+          <p style={{ fontSize: "17px", color: "#F5EFE6", maxWidth: "640px", marginBottom: "28px" }}>
+            Rejoignez la communauté Stag.io et accédez aux étudiants les plus motivés de l'Université de Constantine.
+            Publiez vos offres de stage, gérez vos candidatures depuis un seul tableau de bord, et simplifiez tout votre processus de recrutement — gratuitement.
+          </p>
+          <div className="cta-row" style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
+            <button className="cta-primary">Rejoindre la communauté</button>
+            <a href="/contact" className="cta-link" style={{ color: "#F5EFE6", textDecoration: "underline" }}>Nous contacter</a>
+          </div>
+        </div>
+
       </div>
     </section>
   );

@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { LogIn } from "lucide-react";
 
 export default function Header() {
     const [isScrolled, setIsScrolled] = useState(false);
 
     useEffect(() => {
         const handleScroll = () => {
-            // Header appears only after scrolling past the hero section (100vh)
             const heroHeight = window.innerHeight;
             setIsScrolled(window.scrollY > heroHeight - 80);
         };
@@ -16,18 +17,24 @@ export default function Header() {
     return (
         <nav className={`hs-nav ${isScrolled ? "hs-nav-scrolled" : ""}`}>
             <div className="hs-nav-left">
-                <a href="#" className="hs-logo">
+                <Link to="/" className="hs-logo">
                     Stag<span style={{ color: isScrolled ? "#000" : "#F5C518" }}>.io</span>
-                </a>
+                </Link>
                 <ul className="hs-nav-links">
-                    <li><a href="#" className="active">Étudiants</a></li>
-                    <li><a href="/about">about</a></li>
-                    <li><a href="/contact">Contact us</a></li>
+                    <li><Link to="/offers">Offers</Link></li>
+                    <li><Link to="/Testimonials">Stories</Link></li>
+                    <li><Link to="/FAQ">FAQ</Link></li>
+                    <li><Link to="/Companies">Companies</Link></li>
+                    <li><Link to="/Blog">Blog</Link></li>
+                    <li><Link to="/about">À propos</Link></li>
+                    <li><Link to="/contact">Contact us</Link></li>
                 </ul>
             </div>
             <div className="hs-nav-right">
-                <a href="#" className="hs-login">Connexion</a>
-                <a href="#" className="hs-signup">Inscris-toi</a>
+                <Link to="/login" className="hs-login-btn">
+                    <LogIn size={16} />
+                    <span>Login</span>
+                </Link>
             </div>
         </nav>
     );
