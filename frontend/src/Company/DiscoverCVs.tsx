@@ -73,23 +73,43 @@ const scoreColor = (s: number) =>
   s >= 80 ? "#22c55e" : s >= 55 ? "#f59e0b" : "#ef4444";
 
 function mapStudentCvListItem(r: Record<string, unknown>): StudentCV {
-  const names = (r.skills as string[]) || [];
-  const skills: Skill[] = names.map((name, i) => ({ id: i + 1, name, level: "intermediate" }));
+  const rawSkills = (r.skills as Array<{name: string; level: string}>) || [];
+  const rawLangs = (r.languages as Array<{name: string; level: string}>) || [];
+  const rawEdu = (r.educations as Array<Record<string, unknown>>) || [];
+  const rawExp = (r.experiences as Array<Record<string, unknown>>) || [];
+
   return {
-    student_id: r.student_id as number,
-    full_name: r.full_name as string,
-    email: r.email as string,
-    institution: null,
-    grade: null,
-    speciality: (r.speciality as string) || null,
-    cv_score: 0,
-    github: null,
-    linkedin: null,
-    description: (r.town as string) ? `Ville: ${r.town}` : null,
-    skills,
-    languages: [],
-    educations: [],
-    experiences: [],
+    student_id:  r.student_id as number,
+    full_name:   r.full_name as string,
+    email:       r.email as string,
+    institution: (r.institution as string) || null,
+    grade:       (r.grade as string) || null,
+    speciality:  (r.speciality as string) || null,
+    cv_score:    (r.cv_score as number) || 0,
+    github:      (r.github as string) || null,
+    linkedin:    (r.linkedin as string) || null,
+    description: (r.description as string) || null,
+    skills:      rawSkills.map((sk, i) => ({ id: i+1, name: sk.name, level: sk.level })),
+    languages:   rawLangs.map((l, i) => ({ id: i+1, name: l.name, level: l.level })),
+    educations:  rawEdu.map((e, i) => ({
+      id: i+1,
+      degree: String(e.degree ?? ''),
+      institution: String(e.institution ?? ''),
+      field: e.field ? String(e.field) : null,
+      start_year: Number(e.start_year ?? 0),
+      end_year: e.end_year ? Number(e.end_year) : null,
+      is_current: Boolean(e.is_current),
+    })),
+    experiences: rawExp.map((x, i) => ({
+      id: i+1,
+      job_title: String(x.job_title ?? ''),
+      company: String(x.company ?? ''),
+      location: x.location ? String(x.location) : null,
+      start_date: String(x.start_date ?? ''),
+      end_date: x.end_date ? String(x.end_date) : null,
+      is_current: Boolean(x.is_current),
+      description: x.description ? String(x.description) : null,
+    })),
   };
 }
 

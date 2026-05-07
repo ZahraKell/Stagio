@@ -62,7 +62,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     company_rc: "",
     town: "",
     company_website: "",
-    descreption: "",
+    description: "",
   });
 
   // ”€”€ Step 1 submit ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
@@ -139,12 +139,13 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     setLoading(true);
     try {
       await api.patch("auth/company/complete-profile/", {
+        full_name: details.full_name,
         company_name: details.company_name,
         company_sector: details.company_sector,
         company_rc: details.company_rc,
         company_website: details.company_website,
         town: details.town,
-        description: details.full_name,
+        description: details.description,
       });
       localStorage.setItem("company_status", "pending_approval");
       setStep("pending");
@@ -390,8 +391,8 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
             </label>
             <input
               type="text"
-              value={details.descreption}
-              onChange={e => setDetails({ ...details, descreption: e.target.value })}
+              value={details.description}
+              onChange={e => setDetails({ ...details, description: e.target.value })}
               placeholder="ex: our company is..."
               required
             />

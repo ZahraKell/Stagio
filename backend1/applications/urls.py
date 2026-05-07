@@ -33,4 +33,5 @@ urlpatterns = [
     path('<int:pk>/submit-report/',   views.submit_report),
     path('<int:pk>/validate-report/', views.validate_report),
     path('<int:pk>/issue-attestation/', views.issue_attestation),
+    path('<int:pk>/attestation/', views.download_attestation, name='download-attestation'),
 ]

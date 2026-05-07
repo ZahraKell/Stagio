@@ -10,8 +10,8 @@ class Convention(models.Model):
         VALIDATED       = 'VALIDATED',       'Validated'
         REJECTED        = 'REJECTED',        'Rejected'
 
-    application = models.ForeignKey(
-        'applications.Application',
+    application = models.OneToOneField(   # ← was ForeignKey
+       'applications.Application',
         on_delete=models.CASCADE,
         related_name='convention',
     )

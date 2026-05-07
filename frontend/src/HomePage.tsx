@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import studentImg from "./assets/student.jpg";
 import companyImg from "./assets/company.jpg";
-import block1Img from './assets/block1.png';
+import block1Img from "./assets/block1.png";
 
 const CDN = "https://cdn.sanity.io/images/mz2hls6g/eu-production";
 const IMG = {
@@ -19,35 +20,41 @@ const graduatedStudents = [
     role: "Développeuse Full Stack",
     company: "Microsoft",
     avatar: "https://randomuser.me/api/portraits/women/68.jpg",
-    quote: "Grâce à Stag.io, j'ai décroché un stage chez Microsoft qui s'est transformé en CDI. La plateforme m'a ouvert des portes que je n'aurais jamais imaginées."
+    quote:
+      "Grâce à Stag.io, j'ai décroché un stage chez Microsoft qui s'est transformé en CDI. La plateforme m'a ouvert des portes que je n'aurais jamais imaginées.",
   },
   {
     name: "Karim Benali",
     role: "Data Scientist",
     company: "Google",
     avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-    quote: "Les offres personnalisées et la messagerie directe avec les recruteurs ont changé ma recherche. Aujourd'hui je suis Data Scientist chez Google."
+    quote:
+      "Les offres personnalisées et la messagerie directe avec les recruteurs ont changé ma recherche. Aujourd'hui je suis Data Scientist chez Google.",
   },
   {
     name: "Leila Mansouri",
     role: "Product Manager",
     company: "Amazon",
     avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-    quote: "Stag.io m'a aidée à trouver un stage en product management qui correspondait parfaitement à mes aspirations. Une expérience inoubliable."
+    quote:
+      "Stag.io m'a aidée à trouver un stage en product management qui correspondait parfaitement à mes aspirations. Une expérience inoubliable.",
   },
   {
     name: "Mehdi Kaci",
     role: "Consultant Stratégie",
     company: "Deloitte",
     avatar: "https://randomuser.me/api/portraits/men/75.jpg",
-    quote: "Les événements de networking organisés sur la plateforme m'ont permis de rencontrer des professionnels clés. Je recommande vivement."
+    quote:
+      "Les événements de networking organisés sur la plateforme m'ont permis de rencontrer des professionnels clés. Je recommande vivement.",
   },
 ];
 
 // ---------- Split Hero Component ----------
 function SplitHero() {
+  const navigate = useNavigate();
   const [hovered, setHovered] = useState<string | null>(null);
-  const flex = (id: string) => hovered === id ? 1.7 : hovered !== null ? 0.5 : 1;
+  const flex = (id: string) =>
+    hovered === id ? 1.7 : hovered !== null ? 0.5 : 1;
 
   return (
     <div className="hs-hero-wrap">
@@ -66,8 +73,17 @@ function SplitHero() {
         <div className="hs-panel-body">
           <div className="hs-panel-big-title">Student</div>
           <p className="hs-panel-desc">
-            Find internships that match your skills, connect with leading companies, <br />and take the next step in your career with confidence.</p>
-          <button className="hs-panel-btn">Explore opportunities →</button>
+            Find internships that match your skills, connect with leading
+            companies, <br />
+            and take the next step in your career with confidence.
+          </p>
+          {/* FIX 1: navigate to /login with ?role=etudiant so AuthPage pre-fills role */}
+          <button
+            className="hs-panel-btn"
+            onClick={() => navigate("/login?role=etudiant")}
+          >
+            Explore opportunities →
+          </button>
         </div>
       </div>
       <div className="hs-panel-divider" />
@@ -84,11 +100,18 @@ function SplitHero() {
       >
         <div className="hs-panel-overlay" />
         <div className="hs-panel-body">
-          <div className="hs-panel-big-title">Company</div> {/* Capitalized */}
+          <div className="hs-panel-big-title">Company</div>
           <p className="hs-panel-desc">
-            Publish your internship offers, reach qualified students, <br />and manage applications efficiently from one platform.
+            Publish your internship offers, reach qualified students, <br />
+            and manage applications efficiently from one platform.
           </p>
-          <button className="hs-panel-btn">Post an internship →</button>
+          {/* FIX 1: navigate to /login with ?role=entreprise */}
+          <button
+            className="hs-panel-btn"
+            onClick={() => navigate("/login?role=entreprise")}
+          >
+            Post an internship →
+          </button>
         </div>
       </div>
     </div>
@@ -101,11 +124,11 @@ function ScrollColorSection() {
   const blockRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const bgColors = [
-    "#F5EBD3", // Block 1 — soft cream
-    "#E8D2A8", // Block 2 — warm sand
-    "#C8965E", // Block 3 — honey wood
-    "#B8893E", // Block 4 — vintage gold
-    "#5C1F2E", // Block 5 — deep burgundy
+    "#F5EBD3",
+    "#E8D2A8",
+    "#C8965E",
+    "#B8893E",
+    "#5C1F2E",
   ];
 
   useEffect(() => {
@@ -113,12 +136,14 @@ function ScrollColorSection() {
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            const index = blockRefs.current.findIndex(ref => ref === entry.target);
+            const index = blockRefs.current.findIndex(
+              (ref) => ref === entry.target,
+            );
             if (index !== -1) setActiveBlock(index);
           }
         });
       },
-      { threshold: 0.4, rootMargin: "-10% 0px -10% 0px" }
+      { threshold: 0.4, rootMargin: "-10% 0px -10% 0px" },
     );
     blockRefs.current.forEach((ref) => {
       if (ref) observer.observe(ref);
@@ -126,36 +151,104 @@ function ScrollColorSection() {
     return () => observer.disconnect();
   }, []);
 
-  return (
-    <section className="scroll-color-section" style={{ backgroundColor: bgColors[activeBlock] }}>
-      <div className="scroll-color-container">
+  // FIX 2: Use window.location.href for mailto so it opens in the user's
+  // default mail client (Gmail app / Outlook / etc.) instead of a new tab.
+  const handleJoinCommunity = () => {
+    const to = "fzahrakell@gmail.com";
+    const subject = "Demande d'inscription - Administration universitaire";
+    const body = `Bonjour l'équipe StageConnect,
 
-        {/* Block 1 — Fixed text and image */}
-        <div className="color-block" ref={el => { blockRefs.current[0] = el; }}>
+Je souhaite inscrire mon université sur votre plateforme.
+
+Université : [À compléter]
+Ville : [À compléter]
+Nom : [À compléter]
+Fonction : [À compléter]
+Email : [À compléter]
+
+Merci de me transmettre la procédure d'inscription.
+
+Cordialement,`;
+
+    // Use window.location.href — this triggers the OS mail handler directly
+    window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  return (
+    <section
+      className="scroll-color-section"
+      style={{ backgroundColor: bgColors[activeBlock] }}
+    >
+      <div className="scroll-color-container">
+        {/* Block 1 */}
+        <div
+          className="color-block"
+          ref={(el) => { blockRefs.current[0] = el; }}
+        >
           <div className="split-layout">
             <div className="split-text">
-              <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "44px", fontWeight: 800, marginBottom: "16px", lineHeight: 1.1 }}>
+              <h2
+                style={{
+                  fontFamily: "'Epilogue', sans-serif",
+                  fontSize: "44px",
+                  fontWeight: 800,
+                  marginBottom: "16px",
+                  lineHeight: 1.1,
+                }}
+              >
                 Your career starts here.
               </h2>
-              <p style={{ fontSize: "20px", fontWeight: 500, color: "#2A1F14", marginBottom: "16px" }}>
+              <p
+                style={{
+                  fontSize: "20px",
+                  fontWeight: 500,
+                  color: "#2A1F14",
+                  marginBottom: "16px",
+                }}
+              >
                 Turn your studies into concrete professional experience.
               </p>
-              <p style={{ fontSize: "17px", color: "#5B4A38", maxWidth: "520px", marginBottom: "28px", lineHeight: 1.5 }}>
-                Access internships throughout Algeria, apply quickly and develop your career with leading companies and institutions.</p>
+              <p
+                style={{
+                  fontSize: "17px",
+                  color: "#5B4A38",
+                  maxWidth: "520px",
+                  marginBottom: "28px",
+                  lineHeight: 1.5,
+                }}
+              >
+                Access internships throughout Algeria, apply quickly and develop
+                your career with leading companies and institutions.
+              </p>
               <button className="cta-primary">View offers</button>
             </div>
             <div className="split-image">
-              {/* Real image – replace with your own asset or CDN */}
-              <img src={block1Img} alt="" style={{ width: "100%", borderRadius: "20px", boxShadow: "0 20px 40px rgba(0,0,0,0.1)" }}
+              <img
+                src={block1Img}
+                alt=""
+                style={{
+                  width: "100%",
+                  borderRadius: "20px",
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+                }}
               />
-
             </div>
           </div>
         </div>
 
-        {/* Block 2 — Notre plateforme web */}
-        <div className="color-block" ref={el => { blockRefs.current[1] = el; }}>
-          <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "36px", fontWeight: 800, marginBottom: "16px" }}>
+        {/* Block 2 */}
+        <div
+          className="color-block"
+          ref={(el) => { blockRefs.current[1] = el; }}
+        >
+          <h2
+            style={{
+              fontFamily: "'Epilogue', sans-serif",
+              fontSize: "36px",
+              fontWeight: 800,
+              marginBottom: "16px",
+            }}
+          >
             A complete platform
           </h2>
           <div className="side-layout">
@@ -165,7 +258,7 @@ function ScrollColorSection() {
                 <li>Recommended offers based on your profile</li>
                 <li>Direct messaging with recruiters</li>
                 <li>Real-time application tracking</li>
-                <li>Real-time application tracking</li>
+                <li>CV builder & completion score</li>
               </ul>
             </div>
             <div className="side-phone">
@@ -174,10 +267,20 @@ function ScrollColorSection() {
           </div>
         </div>
 
-        {/* Block 3 — Graduated students */}
-        <div className="color-block" ref={el => { blockRefs.current[2] = el; }}>
-          <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "36px", fontWeight: 800, marginBottom: "16px" }}>
-            They succeeded with InternChips
+        {/* Block 3 */}
+        <div
+          className="color-block"
+          ref={(el) => { blockRefs.current[2] = el; }}
+        >
+          <h2
+            style={{
+              fontFamily: "'Epilogue', sans-serif",
+              fontSize: "36px",
+              fontWeight: 800,
+              marginBottom: "16px",
+            }}
+          >
+            They succeeded with StageConnect
           </h2>
           <p style={{ fontSize: "17px", color: "#555", maxWidth: "600px" }}>
             Students who turned their internship into a career opportunity.
@@ -187,7 +290,11 @@ function ScrollColorSection() {
               <div key={idx} className="testimonial-card">
                 <div className="testimonial-quote">"{student.quote}"</div>
                 <div className="testimonial-author">
-                  <img src={student.avatar} alt={student.name} className="testimonial-avatar" />
+                  <img
+                    src={student.avatar}
+                    alt={student.name}
+                    className="testimonial-avatar"
+                  />
                   <div className="testimonial-info">
                     <h4>{student.name}</h4>
                     <p>{student.role}</p>
@@ -199,9 +306,19 @@ function ScrollColorSection() {
           </div>
         </div>
 
-        {/* Block 4 — Rejoignez l'aventure */}
-        <div className="color-block" ref={el => { blockRefs.current[3] = el; }}>
-          <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "36px", fontWeight: 800, marginBottom: "16px" }}>
+        {/* Block 4 */}
+        <div
+          className="color-block"
+          ref={(el) => { blockRefs.current[3] = el; }}
+        >
+          <h2
+            style={{
+              fontFamily: "'Epilogue', sans-serif",
+              fontSize: "36px",
+              fontWeight: 800,
+              marginBottom: "16px",
+            }}
+          >
             Access the platform from anywhere
           </h2>
           <div className="side-layout" style={{ flexDirection: "row-reverse" }}>
@@ -233,24 +350,68 @@ function ScrollColorSection() {
           </div>
         </div>
 
-        {/* Block 5 — Admin / company invitation */}
-        <div className="color-block" ref={el => { blockRefs.current[4] = el; }}>
-          <h2 style={{ fontFamily: "'Epilogue', sans-serif", fontSize: "36px", fontWeight: 800, marginBottom: "16px", color: "#fff" }}>
+        {/* Block 5 */}
+        <div
+          className="color-block"
+          ref={(el) => { blockRefs.current[4] = el; }}
+        >
+          <h2
+            style={{
+              fontFamily: "'Epilogue', sans-serif",
+              fontSize: "36px",
+              fontWeight: 800,
+              marginBottom: "16px",
+              color: "#fff",
+            }}
+          >
             Vous êtes une entreprise ou une administration ?
           </h2>
-          <p style={{ fontSize: "20px", fontWeight: 500, color: "#FFFFFF", marginBottom: "16px", maxWidth: "640px" }}>
+          <p
+            style={{
+              fontSize: "20px",
+              fontWeight: 500,
+              color: "#FFFFFF",
+              marginBottom: "16px",
+              maxWidth: "640px",
+            }}
+          >
             Trouvez les talents qui feront grandir votre organisation.
           </p>
-          <p style={{ fontSize: "17px", color: "#F5EFE6", maxWidth: "640px", marginBottom: "28px" }}>
-            Rejoignez la communauté Stag.io et accédez aux étudiants les plus motivés de l'Université de Constantine.
-            Publiez vos offres de stage, gérez vos candidatures depuis un seul tableau de bord, et simplifiez tout votre processus de recrutement — gratuitement.
+          <p
+            style={{
+              fontSize: "17px",
+              color: "#F5EFE6",
+              maxWidth: "640px",
+              marginBottom: "28px",
+            }}
+          >
+            Rejoignez la communauté Stag.io et accédez aux étudiants les plus
+            motivés de l'Université de Constantine. Publiez vos offres de stage,
+            gérez vos candidatures depuis un seul tableau de bord, et simplifiez
+            tout votre processus de recrutement — gratuitement.
           </p>
-          <div className="cta-row" style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
-            <button className="cta-primary">Rejoindre la communauté</button>
-            <a href="/contact" className="cta-link" style={{ color: "#F5EFE6", textDecoration: "underline" }}>Nous contacter</a>
+          <div
+            className="cta-row"
+            style={{
+              display: "flex",
+              gap: "16px",
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            {/* FIX 2: button with onClick using window.location.href for mailto */}
+            <button className="cta-primary" onClick={handleJoinCommunity}>
+              Rejoindre la communauté
+            </button>
+            <a
+              href="/contact"
+              className="cta-link"
+              style={{ color: "#F5EFE6", textDecoration: "underline" }}
+            >
+              Nous contacter
+            </a>
           </div>
         </div>
-
       </div>
     </section>
   );

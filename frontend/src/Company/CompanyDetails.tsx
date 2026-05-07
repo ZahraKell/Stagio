@@ -5,19 +5,36 @@ import type { Offer } from "./CompanyOffers";
 import api from "../api";
 import toast from "react-hot-toast";
 
-// ”€”€ TYPES ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── TYPES ──────────────────────────────────────────────────────────────────
 interface Applicant {
-  id:          number;
+  id:           number;
+  student_id:   number;        // ← ADD: needed to fetch CV
   student_name: string;
   student_email: string;
-  offer_title: string;
-  status:      string;
-  date:        string;
-  cv_score:    number;
+  offer_title:  string;
+  status:       string;
+  date:         string;
+  cv_score:     number;        // ← now populated from API
   cover_letter?: string;
 }
 
-// ”€”€ HELPERS ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// CV section types
+interface CvSkill      { id: number; name: string; level: string; }
+interface CvLanguage   { id: number; name: string; level: string; }
+interface CvEducation  { id: number; degree: string; institution: string; field: string; start_year: number; end_year: number | null; is_current: boolean; }
+interface CvExperience { id: number; job_title: string; company: string; location: string; start_date: string; end_date: string | null; is_current: boolean; description: string; }
+interface CvData {
+  cv_score?: number;
+  github?: string;
+  linkedin?: string;
+  description?: string;
+  skills?: CvSkill[];
+  languages?: CvLanguage[];
+  educations?: CvEducation[];
+  experiences?: CvExperience[];
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
 const TYPE_LABELS: Record<string, string> = {
   INTERNSHIP: "Stage professionnel",
   ALTERNANCE: "Alternance",
@@ -46,26 +63,20 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-// ”€”€ MODAL WRAPPER ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── MODAL WRAPPER ──────────────────────────────────────────────────────────
 function Modal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="od-modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="od-modal">
-        {children}
-      </div>
+      <div className="od-modal">{children}</div>
     </div>
   );
 }
 
-// ”€”€ UPDATE FORM ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── UPDATE FORM ────────────────────────────────────────────────────────────
 function UpdateForm({
-  offer,
-  onClose,
-  onSaved,
+  offer, onClose, onSaved,
 }: {
-  offer: Offer;
-  onClose: () => void;
-  onSaved: (updated: Offer) => void;
+  offer: Offer; onClose: () => void; onSaved: (updated: Offer) => void;
 }) {
   const [form, setForm] = useState({
     title:           offer.title,
@@ -80,8 +91,8 @@ function UpdateForm({
     deadline:        offer.deadline || "",
     status:          offer.status,
   });
-  const [saving,  setSaving]  = useState(false);
-  const [error,   setError]   = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -115,18 +126,12 @@ function UpdateForm({
           <h3>Modifier l'offre</h3>
           <button className="od-close-btn" onClick={onClose}>✕</button>
         </div>
-
         {error && <div className="od-form-error">{error}</div>}
-
         <form onSubmit={handleSubmit} className="od-form-grid">
-
-          {/* Title */}
           <div className="od-field od-field-full">
             <label>Titre du poste *</label>
             <input name="title" value={form.title} onChange={handleChange} required />
           </div>
-
-          {/* Town + Duration */}
           <div className="od-field">
             <label>Ville *</label>
             <input name="town" value={form.town} onChange={handleChange} required />
@@ -135,8 +140,6 @@ function UpdateForm({
             <label>Durée</label>
             <input name="duration" value={form.duration} onChange={handleChange} placeholder="ex: 3 mois" />
           </div>
-
-          {/* Type + Status */}
           <div className="od-field">
             <label>Type de stage</label>
             <select name="internship_type" value={form.internship_type} onChange={handleChange}>
@@ -153,31 +156,18 @@ function UpdateForm({
               <option value="filled">Pourvue</option>
             </select>
           </div>
-
-          {/* Field */}
           <div className="od-field">
             <label>Domaine</label>
             <input name="field" value={form.field} onChange={handleChange} placeholder="ex: Informatique" />
           </div>
-
-          {/* Deadline */}
           <div className="od-field">
             <label>Date limite</label>
             <input type="date" name="deadline" value={form.deadline} onChange={handleChange} />
           </div>
-
-          {/* Paid toggle + salary */}
           <div className="od-field od-field-full">
             <label className="od-toggle-label">
-              <input
-                type="checkbox"
-                name="is_paid"
-                checked={form.is_paid}
-                onChange={handleChange}
-              />
-              <span className="od-toggle-track">
-                <span className="od-toggle-thumb" />
-              </span>
+              <input type="checkbox" name="is_paid" checked={form.is_paid} onChange={handleChange} />
+              <span className="od-toggle-track"><span className="od-toggle-thumb" /></span>
               Stage rémunéré
             </label>
           </div>
@@ -187,46 +177,31 @@ function UpdateForm({
               <input name="salary" value={form.salary} onChange={handleChange} placeholder="ex: 15000 DA/mois" />
             </div>
           )}
-
-          {/* Tech stack */}
           <div className="od-field od-field-full">
             <label>Technologies / Compétences requises</label>
             <input name="tech_stack" value={form.tech_stack} onChange={handleChange} placeholder="ex: Python, Django, React" />
           </div>
-
-          {/* Description */}
           <div className="od-field od-field-full">
             <label>Description *</label>
             <textarea name="description" value={form.description} onChange={handleChange} rows={4} required />
           </div>
-
-          {/* Actions */}
           <div className="od-form-actions od-field-full">
-            <button type="button" className="od-btn-cancel" onClick={onClose}>
-              Annuler
-            </button>
+            <button type="button" className="od-btn-cancel" onClick={onClose}>Annuler</button>
             <button type="submit" className="od-btn-save" disabled={saving}>
               {saving ? "Enregistrement…" : "Enregistrer les modifications"}
             </button>
           </div>
-
         </form>
       </div>
     </Modal>
   );
 }
 
-// ”€”€ DELETE CONFIRM POPUP ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── DELETE CONFIRM ─────────────────────────────────────────────────────────
 function DeleteConfirm({
-  offerTitle,
-  onCancel,
-  onConfirm,
-  loading,
+  offerTitle, onCancel, onConfirm, loading,
 }: {
-  offerTitle: string;
-  onCancel:  () => void;
-  onConfirm: () => void;
-  loading:   boolean;
+  offerTitle: string; onCancel: () => void; onConfirm: () => void; loading: boolean;
 }) {
   return (
     <Modal onClose={onCancel}>
@@ -243,12 +218,10 @@ function DeleteConfirm({
         <p>
           Vous êtes sur le point de supprimer l'offre<br />
           <strong>« {offerTitle} »</strong>.<br />
-          Cette action est irréversible. Toutes les candidatures associées seront également supprimées.
+          Cette action est irréversible.
         </p>
         <div className="od-delete-actions">
-          <button className="od-btn-cancel" onClick={onCancel} disabled={loading}>
-            Annuler
-          </button>
+          <button className="od-btn-cancel" onClick={onCancel} disabled={loading}>Annuler</button>
           <button className="od-btn-delete" onClick={onConfirm} disabled={loading}>
             {loading ? "Suppression…" : "Oui, supprimer"}
           </button>
@@ -258,13 +231,9 @@ function DeleteConfirm({
   );
 }
 
-// ”€”€ CV MODAL ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── CV MODAL — FIXED ───────────────────────────────────────────────────────
 function CVModal({
-  applicant,
-  onClose,
-  onAccept,
-  onRefuse,
-  actionLoading,
+  applicant, onClose, onAccept, onRefuse, actionLoading,
 }: {
   applicant:     Applicant;
   onClose:       () => void;
@@ -272,28 +241,32 @@ function CVModal({
   onRefuse:      (id: number) => void;
   actionLoading: number | null;
 }) {
-  const [cvData, setCvData] = useState<Record<string, unknown> | null>(null);
+  // FIX: fetch the actual student CV using student_id, not application id
+  const [cvData,    setCvData]    = useState<CvData | null>(null);
   const [cvLoading, setCvLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get(`applications/${applicant.id}/`);
-        const body = data as { error?: boolean; data?: Record<string, unknown> };
-        setCvData(body.data ?? null);
-      } catch {
-        setCvData(null);
-      } finally {
-        setCvLoading(false);
-      }
-    })();
-  }, [applicant.id]);
+    setCvData(null);
+    setCvLoading(true);
+    // FIX: call the correct endpoint with the student's PK
+    api.get(`users/students/${applicant.student_id}/cv/`)
+      .then(res => {
+        console.log("CV API response:", JSON.stringify(res.data));
+        const body = res.data as { error?: boolean; data?: CvData };
+        if (!body.error && body.data) {
+          setCvData(body.data);
+        }
+      })
+      .catch(() => setCvData(null))
+      .finally(() => setCvLoading(false));
+  }, [applicant.student_id]);
 
   const isActing = actionLoading === applicant.id;
 
   return (
     <Modal onClose={onClose}>
       <div className="od-cv-modal">
+        {/* Header */}
         <div className="od-modal-head">
           <div className="od-cv-modal-title">
             <div className="od-cv-av">{applicant.student_name.charAt(0)}</div>
@@ -313,12 +286,31 @@ function CVModal({
             </div>
           ) : (
             <>
-              {/* Score + Status */}
+              {/* FIX: cv_score is now passed from the real applicant data */}
               <div className="od-cv-score-row">
-                <ScoreRing score={applicant.cv_score} />
+                <ScoreRing score={cvData?.cv_score ?? applicant.cv_score} />
                 <div>
                   <p className="od-cv-score-label">Score de complétude du CV</p>
                   <StatusBadge status={applicant.status} />
+                </div>
+              </div>
+
+              {/* Application info */}
+              <div className="od-cv-section">
+                <h4>Informations de candidature</h4>
+                <div className="od-cv-info-grid">
+                  <div className="od-cv-info-item">
+                    <span>Offre</span>
+                    <strong>{applicant.offer_title}</strong>
+                  </div>
+                  <div className="od-cv-info-item">
+                    <span>Date de candidature</span>
+                    <strong>{applicant.date}</strong>
+                  </div>
+                  <div className="od-cv-info-item">
+                    <span>Statut actuel</span>
+                    <StatusBadge status={applicant.status} />
+                  </div>
                 </div>
               </div>
 
@@ -326,61 +318,163 @@ function CVModal({
               {applicant.cover_letter && (
                 <div className="od-cv-section">
                   <h4>Lettre de motivation</h4>
-                  <p>{applicant.cover_letter}</p>
+                  <p style={{ fontSize: "0.82rem", color: "#374151", lineHeight: 1.6 }}>
+                    {applicant.cover_letter}
+                  </p>
                 </div>
               )}
 
-              {/* Raw CV info from API */}
-              {cvData && (
-                <div className="od-cv-section">
-                  <h4>Informations de candidature</h4>
-                  <div className="od-cv-info-grid">
-                    <div className="od-cv-info-item">
-                      <span>Offre</span>
-                      <strong>{applicant.offer_title}</strong>
+              {/* FIX: show real CV data if available */}
+              {cvData ? (
+                <>
+                  {/* Summary */}
+                  {cvData.description && (
+                    <div className="od-cv-section">
+                      <h4>Résumé</h4>
+                      <p style={{ fontSize: "0.82rem", color: "#374151", lineHeight: 1.6 }}>
+                        {cvData.description}
+                      </p>
                     </div>
-                    <div className="od-cv-info-item">
-                      <span>Date de candidature</span>
-                      <strong>{applicant.date}</strong>
+                  )}
+
+                  {/* Skills */}
+                  {cvData.skills && cvData.skills.length > 0 && (
+                    <div className="od-cv-section">
+                      <h4>Compétences</h4>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {cvData.skills.map(sk => (
+                          <span key={sk.id} className="od-skill-tag" style={{ fontSize: 12 }}>
+                            {sk.name}
+                            <span style={{
+                              marginLeft: 4, fontSize: 10, opacity: 0.7,
+                              background: "rgba(0,0,0,0.08)", padding: "1px 5px", borderRadius: 4
+                            }}>
+                              {sk.level}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div className="od-cv-info-item">
-                      <span>Statut actuel</span>
-                      <StatusBadge status={applicant.status} />
+                  )}
+
+                  {/* Languages */}
+                  {cvData.languages && cvData.languages.length > 0 && (
+                    <div className="od-cv-section">
+                      <h4>Langues</h4>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {cvData.languages.map(l => (
+                          <span key={l.id} style={{
+                            background: "#f0f9ff", color: "#0369a1",
+                            border: "1px solid #bae6fd",
+                            borderRadius: 99, fontSize: 12,
+                            fontWeight: 600, padding: "2px 10px"
+                          }}>
+                            {l.name} — {l.level}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Education */}
+                  {cvData.educations && cvData.educations.length > 0 && (
+                    <div className="od-cv-section">
+                      <h4>Formation</h4>
+                      {cvData.educations.map(e => (
+                        <div key={e.id} style={{
+                          background: "#f8fafc", borderRadius: 8,
+                          padding: "8px 12px", marginBottom: 8,
+                          borderLeft: "3px solid #3b82f6"
+                        }}>
+                          <strong style={{ fontSize: "0.82rem", display: "block" }}>{e.degree}</strong>
+                          <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                            {e.institution} — {e.start_year}{e.is_current ? " – Présent" : e.end_year ? ` – ${e.end_year}` : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Experience */}
+                  {cvData.experiences && cvData.experiences.length > 0 && (
+                    <div className="od-cv-section">
+                      <h4>Expériences</h4>
+                      {cvData.experiences.map(x => (
+                        <div key={x.id} style={{
+                          background: "#f8fafc", borderRadius: 8,
+                          padding: "8px 12px", marginBottom: 8,
+                          borderLeft: "3px solid #a855f7"
+                        }}>
+                          <strong style={{ fontSize: "0.82rem", display: "block" }}>{x.job_title}</strong>
+                          <span style={{ fontSize: "0.75rem", color: "#64748b", display: "block" }}>
+                            {x.company}{x.location ? ` · ${x.location}` : ""} — {x.start_date}{x.is_current ? " – Présent" : x.end_date ? ` – ${x.end_date}` : ""}
+                          </span>
+                          {x.description && (
+                            <p style={{ fontSize: "0.73rem", color: "#374151", marginTop: 4, lineHeight: 1.5 }}>
+                              {x.description}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Links */}
+                  {(cvData.github || cvData.linkedin) && (
+                    <div className="od-cv-section">
+                      <h4>Liens</h4>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {cvData.github && (
+                          <a href={cvData.github} target="_blank" rel="noreferrer" style={{
+                            background: "#f0fdf4", color: "#166534",
+                            border: "1px solid #bbf7d0",
+                            borderRadius: 6, fontSize: 12, fontWeight: 600,
+                            padding: "3px 10px", textDecoration: "none"
+                          }}>
+                            GitHub ↗
+                          </a>
+                        )}
+                        {cvData.linkedin && (
+                          <a href={cvData.linkedin} target="_blank" rel="noreferrer" style={{
+                            background: "#eff6ff", color: "#1d4ed8",
+                            border: "1px solid #bfdbfe",
+                            borderRadius: 6, fontSize: 12, fontWeight: 600,
+                            padding: "3px 10px", textDecoration: "none"
+                          }}>
+                            LinkedIn ↗
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Student hasn't created a CV yet
+                <div className="od-cv-note">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ width: 16, height: 16, flexShrink: 0 }}>
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  Cet étudiant n'a pas encore créé son CV numérique.
                 </div>
               )}
-
-              <div className="od-cv-section od-cv-note">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:16,height:16,flexShrink:0}}>
-                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                Le CV complet du stagiaire sera disponible une fois la fonctionnalité CV connectée au profil étudiant.
-              </div>
             </>
           )}
         </div>
 
-        {/* Action buttons — only show if status is pending or reviewed */}
+        {/* Footer actions */}
         {(applicant.status === "pending" || applicant.status === "reviewed") && (
           <div className="od-cv-footer">
-            <button
-              className="od-btn-refuse"
-              disabled={isActing}
-              onClick={() => onRefuse(applicant.id)}
-            >
+            <button className="od-btn-refuse" disabled={isActing} onClick={() => onRefuse(applicant.id)}>
               {isActing ? "…" : "✕  Refuser"}
             </button>
-            <button
-              className="od-btn-accept"
-              disabled={isActing}
-              onClick={() => onAccept(applicant.id)}
-            >
+            <button className="od-btn-accept" disabled={isActing} onClick={() => onAccept(applicant.id)}>
               {isActing ? "…" : "✓  Accepter"}
             </button>
           </div>
         )}
-
         {applicant.status === "accepted" && (
           <div className="od-cv-footer od-cv-footer-accepted">
             ✅ Candidat accepté — Convention générée automatiquement
@@ -396,20 +490,20 @@ function CVModal({
   );
 }
 
-// ”€”€ MAIN DETAIL PAGE ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── MAIN DETAIL PAGE ───────────────────────────────────────────────────────
 export default function OfferDetail() {
-  const { id }    = useParams<{ id: string }>();
-  const navigate  = useNavigate();
+  const { id }   = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
-  const [offer,          setOffer]          = useState<Offer | null>(null);
-  const [applicants,     setApplicants]     = useState<Applicant[]>([]);
-  const [loading,        setLoading]        = useState(true);
-  const [showDelete,     setShowDelete]     = useState(false);
-  const [showUpdate,     setShowUpdate]     = useState(false);
-  const [selectedCV,     setSelectedCV]     = useState<Applicant | null>(null);
-  const [deleteLoading,  setDeleteLoading]  = useState(false);
-  const [actionLoading,  setActionLoading]  = useState<number | null>(null);
-  const [appsFilter,     setAppsFilter]     = useState<"all" | "pending" | "accepted" | "refused">("all");
+  const [offer,         setOffer]         = useState<Offer | null>(null);
+  const [applicants,    setApplicants]    = useState<Applicant[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [showDelete,    setShowDelete]    = useState(false);
+  const [showUpdate,    setShowUpdate]    = useState(false);
+  const [selectedCV,    setSelectedCV]    = useState<Applicant | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [appsFilter,    setAppsFilter]    = useState<"all" | "pending" | "accepted" | "refused">("all");
 
   const OFFER_IMAGES = [
     "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop",
@@ -419,7 +513,7 @@ export default function OfferDetail() {
     "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&auto=format&fit=crop",
   ];
 
-  // ”€”€ Fetch offer + applicants ”€”€
+  // Fetch offer + applicants
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -430,12 +524,14 @@ export default function OfferDetail() {
           api.get(`applications/offer/${id}/`),
         ]);
         if (cancelled) return;
+
         if (offerRes.status === "fulfilled") {
           setOffer(offerRes.value.data as Offer);
         } else {
           setOffer(null);
           toast.error("Offre introuvable.");
         }
+
         if (appsRes.status === "fulfilled") {
           const payload = appsRes.value.data as {
             error?: boolean;
@@ -444,14 +540,17 @@ export default function OfferDetail() {
           const raw = payload.data?.applications ?? [];
           setApplicants(
             raw.map((row) => ({
-              id: row.id as number,
-              student_name: String(row.student_name ?? ""),
+              id:            row.id as number,
+              // FIX: map student_id from the API response
+              student_id:    (row.student_id ?? row.student ?? 0) as number,
+              student_name:  String(row.student_name ?? ""),
               student_email: String(row.student_email ?? ""),
-              offer_title: String(row.offer_title ?? ""),
-              status: String(row.status ?? "pending").toLowerCase(),
-              date: String(row.application_date ?? "").split("T")[0],
-              cv_score: 0,
-              cover_letter: typeof row.cover_letter === "string" ? row.cover_letter : "",
+              offer_title:   String(row.offer_title ?? ""),
+              status:        String(row.status ?? "pending").toLowerCase(),
+              date:          String(row.application_date ?? "").split("T")[0],
+              // FIX: use cv_score from API if available, otherwise 0
+              cv_score:      typeof row.cv_score === "number" ? row.cv_score : 0,
+              cover_letter:  typeof row.cover_letter === "string" ? row.cover_letter : "",
             })),
           );
         } else {
@@ -467,12 +566,10 @@ export default function OfferDetail() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [id]);
 
-  // ”€”€ Delete offer ”€”€
+  // Delete offer
   const handleDelete = async () => {
     setDeleteLoading(true);
     try {
@@ -485,7 +582,7 @@ export default function OfferDetail() {
     }
   };
 
-  // ”€”€ Accept applicant ”€”€
+  // Accept applicant
   const handleAccept = async (appId: number) => {
     setActionLoading(appId);
     try {
@@ -499,7 +596,7 @@ export default function OfferDetail() {
     }
   };
 
-  // ”€”€ Refuse applicant ”€”€
+  // Refuse applicant
   const handleRefuse = async (appId: number) => {
     setActionLoading(appId);
     try {
@@ -555,15 +652,15 @@ export default function OfferDetail() {
     <CompanyLayout>
       <div className="od-root">
 
-        {/* ”€”€ BACK BUTTON ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
+        {/* Back button */}
         <button className="od-back-btn" onClick={() => navigate("/company/offers")}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{width:16,height:16}}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 16, height: 16 }}>
             <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
           </svg>
           Retour aux offres
         </button>
 
-        {/* ”€”€ OFFER HEADER CARD ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
+        {/* Offer hero card */}
         <div className="od-hero">
           <div className="od-hero-img">
             <img src={coverImg} alt={offer.title} />
@@ -579,14 +676,14 @@ export default function OfferDetail() {
               </div>
               <div className="od-hero-actions">
                 <button className="od-btn-update" onClick={() => setShowUpdate(true)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:15,height:15}}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 15, height: 15 }}>
                     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                     <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                   </svg>
                   Modifier
                 </button>
                 <button className="od-btn-del" onClick={() => setShowDelete(true)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:15,height:15}}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 15, height: 15 }}>
                     <polyline points="3 6 5 6 21 6"/>
                     <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
                   </svg>
@@ -595,7 +692,6 @@ export default function OfferDetail() {
               </div>
             </div>
 
-            {/* Offer metadata */}
             <div className="od-meta-row">
               <span className="od-meta-chip">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -617,10 +713,8 @@ export default function OfferDetail() {
               )}
             </div>
 
-            {/* Description */}
             <p className="od-description">{offer.description}</p>
 
-            {/* Skills */}
             {skills.length > 0 && (
               <div className="od-skills-row">
                 <span className="od-skills-label">Compétences :</span>
@@ -632,15 +726,13 @@ export default function OfferDetail() {
           </div>
         </div>
 
-        {/* ”€”€ APPLICANTS SECTION ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
+        {/* Applicants section */}
         <div className="od-apps-section">
           <div className="od-apps-header">
             <h2 className="od-apps-title">
               Candidatures
               <span className="od-apps-count">{applicants.length}</span>
             </h2>
-
-            {/* Filter tabs */}
             <div className="od-apps-tabs">
               {(["all", "pending", "accepted", "refused"] as const).map(f => (
                 <button
@@ -655,22 +747,15 @@ export default function OfferDetail() {
             </div>
           </div>
 
-          {/* Empty state */}
           {filteredApps.length === 0 && (
             <div className="od-apps-empty">
-              <p>Aucune candidature {appsFilter !== "all" ? `avec ce statut` : "pour cette offre"} pour le moment.</p>
+              <p>Aucune candidature {appsFilter !== "all" ? "avec ce statut" : "pour cette offre"} pour le moment.</p>
             </div>
           )}
 
-          {/* Applicant rows */}
           <div className="od-apps-list">
             {filteredApps.map((app, i) => (
-              <div
-                key={app.id}
-                className="od-app-row"
-                style={{ animationDelay: `${i * 50}ms` }}
-              >
-                {/* Avatar + name */}
+              <div key={app.id} className="od-app-row" style={{ animationDelay: `${i * 50}ms` }}>
                 <div className="od-app-identity">
                   <div className="od-app-av">{app.student_name.charAt(0)}</div>
                   <div className="od-app-info">
@@ -679,48 +764,28 @@ export default function OfferDetail() {
                   </div>
                 </div>
 
-                {/* CV Score */}
                 <div className="od-app-score">
-                  <div
-                    className="od-score-bar"
-                    title={`Score CV : ${app.cv_score}%`}
-                  >
+                  <div className="od-score-bar" title={`Score CV : ${app.cv_score}%`}>
                     <div
                       className="od-score-fill"
                       style={{
                         width: `${app.cv_score}%`,
-                        background: app.cv_score >= 80
-                          ? "#22c55e"
-                          : app.cv_score >= 55
-                          ? "#f59e0b"
-                          : "#ef4444",
+                        background: app.cv_score >= 80 ? "#22c55e" : app.cv_score >= 55 ? "#f59e0b" : "#ef4444",
                       }}
                     />
                   </div>
-                  <span
-                    style={{
-                      color: app.cv_score >= 80 ? "#22c55e" : app.cv_score >= 55 ? "#f59e0b" : "#ef4444",
-                    }}
-                  >
+                  <span style={{ color: app.cv_score >= 80 ? "#22c55e" : app.cv_score >= 55 ? "#f59e0b" : "#ef4444" }}>
                     {app.cv_score}%
                   </span>
                 </div>
 
-                {/* Date */}
                 <span className="od-app-date">{app.date}</span>
-
-                {/* Status */}
                 <StatusBadge status={app.status} />
 
-                {/* Actions */}
                 <div className="od-app-actions">
-                  <button
-                    className="od-see-cv-btn"
-                    onClick={() => setSelectedCV(app)}
-                  >
+                  <button className="od-see-cv-btn" onClick={() => setSelectedCV(app)}>
                     Voir CV
                   </button>
-
                   {(app.status === "pending" || app.status === "reviewed") && (
                     <>
                       <button
@@ -744,10 +809,9 @@ export default function OfferDetail() {
             ))}
           </div>
         </div>
-
       </div>
 
-      {/* ”€”€ MODALS ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
+      {/* Modals */}
       {showDelete && (
         <DeleteConfirm
           offerTitle={offer.title}
@@ -774,7 +838,6 @@ export default function OfferDetail() {
           actionLoading={actionLoading}
         />
       )}
-
     </CompanyLayout>
   );
 }

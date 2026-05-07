@@ -115,7 +115,11 @@ function SectionWrap({
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="sc-cv-section-wrap">
-      <button type="button" className="sc-cv-section-toggle" onClick={() => setOpen((o) => !o)}>
+      <button
+        type="button"
+        className="sc-cv-section-toggle"
+        onClick={() => setOpen((o) => !o)}
+      >
         <div className="sc-cv-section-toggle-left">
           <div className="sc-cv-sec-icon">{icon}</div>
           {title}
@@ -238,10 +242,16 @@ function EuroCvPreview({
                     </div>
                     <span className="euro-cv-entry-date">
                       {e.start_year}
-                      {e.is_current ? " – Present" : e.end_year ? ` – ${e.end_year}` : ""}
+                      {e.is_current
+                        ? " – Present"
+                        : e.end_year
+                          ? ` – ${e.end_year}`
+                          : ""}
                     </span>
                   </div>
-                  {e.description && <div className="euro-cv-entry-desc">{e.description}</div>}
+                  {e.description && (
+                    <div className="euro-cv-entry-desc">{e.description}</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -258,10 +268,16 @@ function EuroCvPreview({
                     </div>
                     <span className="euro-cv-entry-date">
                       {x.start_date}
-                      {x.is_current ? " – Present" : x.end_date ? ` – ${x.end_date}` : ""}
+                      {x.is_current
+                        ? " – Present"
+                        : x.end_date
+                          ? ` – ${x.end_date}`
+                          : ""}
                     </span>
                   </div>
-                  {x.description && <div className="euro-cv-entry-desc">{x.description}</div>}
+                  {x.description && (
+                    <div className="euro-cv-entry-desc">{x.description}</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -318,20 +334,26 @@ export default function MyCv() {
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [pRes, cRes, sRes] = await Promise.all([
-        api.get("auth/profile/"),
-        api.get("auth/cv/"),
-        api.get("auth/cv/score/"),
-      ]);
+      const pRes = await api.get("auth/profile/");
       setProfile(unwrapData<ProfilePayload>(pRes));
+    } catch (e) {
+      toast.error("Could not load profile.");
+      console.error("Profile load error:", e);
+    }
+    try {
+      const cRes = await api.get("auth/cv/");
       const cv = unwrapData<CvData | null>(cRes);
       applyCv(cv);
+    } catch {
+      // CV might not exist yet — that's OK
+    }
+    try {
+      const sRes = await api.get("auth/cv/score/");
       setScore(unwrapData<ScorePayload>(sRes));
     } catch {
-      toast.error("Could not load CV data.");
-    } finally {
-      setLoading(false);
+      // Score endpoint failed — not critical
     }
+    setLoading(false);
   }, [applyCv]);
 
   useEffect(() => {
@@ -395,7 +417,9 @@ export default function MyCv() {
         });
         const newId = (res.data as { data?: { id?: number } })?.data?.id;
         if (newId) {
-          setEducations((list) => list.map((x) => (x.id === e.id ? { ...x, id: newId } : x)));
+          setEducations((list) =>
+            list.map((x) => (x.id === e.id ? { ...x, id: newId } : x)),
+          );
         }
         toast.success("Education added.");
       } else {
@@ -464,7 +488,9 @@ export default function MyCv() {
         });
         const newId = (res.data as { data?: { id?: number } })?.data?.id;
         if (newId) {
-          setExperiences((list) => list.map((r) => (r.id === x.id ? { ...r, id: newId } : r)));
+          setExperiences((list) =>
+            list.map((r) => (r.id === x.id ? { ...r, id: newId } : r)),
+          );
         }
         toast.success("Experience added.");
       } else {
@@ -500,7 +526,10 @@ export default function MyCv() {
   };
 
   const addSkillLocal = () => {
-    setSkills((list) => [...list, { id: nextTemp(), name: "", level: "intermediate" }]);
+    setSkills((list) => [
+      ...list,
+      { id: nextTemp(), name: "", level: "intermediate" },
+    ]);
   };
 
   const persistSkill = async (s: CvSkill) => {
@@ -513,7 +542,10 @@ export default function MyCv() {
         await api.post("auth/cv/skill/", { name: s.name, level: s.level });
         toast.success("Skill added.");
       } else {
-        await api.patch(`auth/cv/skill/${s.id}/`, { name: s.name, level: s.level });
+        await api.patch(`auth/cv/skill/${s.id}/`, {
+          name: s.name,
+          level: s.level,
+        });
         toast.success("Skill updated.");
       }
       await refreshAll();
@@ -536,7 +568,10 @@ export default function MyCv() {
   };
 
   const addLangLocal = () => {
-    setLanguages((list) => [...list, { id: nextTemp(), name: "", level: "B1" }]);
+    setLanguages((list) => [
+      ...list,
+      { id: nextTemp(), name: "", level: "B1" },
+    ]);
   };
 
   const persistLanguage = async (l: CvLanguage) => {
@@ -549,7 +584,10 @@ export default function MyCv() {
         await api.post("auth/cv/language/", { name: l.name, level: l.level });
         toast.success("Language added.");
       } else {
-        await api.patch(`auth/cv/language/${l.id}/`, { name: l.name, level: l.level });
+        await api.patch(`auth/cv/language/${l.id}/`, {
+          name: l.name,
+          level: l.level,
+        });
         toast.success("Language updated.");
       }
       await refreshAll();
@@ -587,7 +625,10 @@ export default function MyCv() {
         <div className="hero-overlay" />
         <div className="hero-content">
           <h1>Digital CV</h1>
-          <p>Data is loaded and saved on the server. Completion score comes from the backend.</p>
+          <p>
+            Data is loaded and saved on the server. Completion score comes from
+            the backend.
+          </p>
         </div>
       </div>
 
@@ -606,19 +647,38 @@ export default function MyCv() {
 
       <div className="sc-cv-topbar">
         <div className="sc-cv-tabs">
-          <button type="button" className={`sc-cv-tab${tab === "edit" ? " active" : ""}`} onClick={() => setTab("edit")}>
+          <button
+            type="button"
+            className={`sc-cv-tab${tab === "edit" ? " active" : ""}`}
+            onClick={() => setTab("edit")}
+          >
             <Edit3 size={15} /> Edit
           </button>
-          <button type="button" className={`sc-cv-tab${tab === "preview" ? " active" : ""}`} onClick={() => setTab("preview")}>
+          <button
+            type="button"
+            className={`sc-cv-tab${tab === "preview" ? " active" : ""}`}
+            onClick={() => setTab("preview")}
+          >
             <Eye size={15} /> Preview
           </button>
         </div>
         <div className="sc-cv-topbar-right">
           <CompletionBar pct={pct} />
-          <button type="button" className="sc-btn-outline" onClick={() => void refreshAll()}>
+          <button
+            type="button"
+            className="sc-btn-outline"
+            onClick={() => void refreshAll()}
+          >
             <RefreshCw size={14} /> Reload
           </button>
-          <button type="button" className="sc-btn-primary" onClick={() => { setTab("preview"); setTimeout(() => window.print(), 300); }}>
+          <button
+            type="button"
+            className="sc-btn-primary"
+            onClick={() => {
+              setTab("preview");
+              setTimeout(() => window.print(), 300);
+            }}
+          >
             <Download size={14} /> Export PDF
           </button>
         </div>
@@ -630,22 +690,41 @@ export default function MyCv() {
             <div className="sc-form-grid">
               <div className="sc-form-group">
                 <label>GitHub</label>
-                <input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="https://github.com/..." />
+                <input
+                  value={github}
+                  onChange={(e) => setGithub(e.target.value)}
+                  placeholder="https://github.com/..."
+                />
               </div>
               <div className="sc-form-group">
                 <label>LinkedIn</label>
-                <input value={linkedin} onChange={(e) => setLinkedin(e.target.value)} />
+                <input
+                  value={linkedin}
+                  onChange={(e) => setLinkedin(e.target.value)}
+                />
               </div>
               <div className="sc-form-group">
                 <label>Portfolio</label>
-                <input value={portfolio} onChange={(e) => setPortfolio(e.target.value)} />
+                <input
+                  value={portfolio}
+                  onChange={(e) => setPortfolio(e.target.value)}
+                />
               </div>
               <div className="sc-form-group sc-col-full">
                 <label>Summary</label>
-                <textarea value={description} rows={4} onChange={(e) => setDescription(e.target.value)} />
+                <textarea
+                  value={description}
+                  rows={4}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
               </div>
             </div>
-            <button type="button" className="sc-btn-primary" disabled={saving} onClick={() => void saveGeneral()}>
+            <button
+              type="button"
+              className="sc-btn-primary"
+              disabled={saving}
+              onClick={() => void saveGeneral()}
+            >
               {saving ? "Saving…" : "Save summary & links"}
             </button>
           </SectionWrap>
@@ -655,7 +734,11 @@ export default function MyCv() {
               <div key={e.id} className="sc-cv-entry-block">
                 <div className="sc-cv-entry-block-header">
                   <span className="sc-cv-entry-num">Entry {idx + 1}</span>
-                  <button type="button" className="sc-cv-del-btn" onClick={() => void removeEducation(e)}>
+                  <button
+                    type="button"
+                    className="sc-cv-del-btn"
+                    onClick={() => void removeEducation(e)}
+                  >
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -665,7 +748,13 @@ export default function MyCv() {
                     <input
                       value={e.degree}
                       onChange={(ev) =>
-                        setEducations((list) => list.map((x) => (x.id === e.id ? { ...x, degree: ev.target.value } : x)))
+                        setEducations((list) =>
+                          list.map((x) =>
+                            x.id === e.id
+                              ? { ...x, degree: ev.target.value }
+                              : x,
+                          ),
+                        )
                       }
                     />
                   </div>
@@ -674,7 +763,13 @@ export default function MyCv() {
                     <input
                       value={e.institution}
                       onChange={(ev) =>
-                        setEducations((list) => list.map((x) => (x.id === e.id ? { ...x, institution: ev.target.value } : x)))
+                        setEducations((list) =>
+                          list.map((x) =>
+                            x.id === e.id
+                              ? { ...x, institution: ev.target.value }
+                              : x,
+                          ),
+                        )
                       }
                     />
                   </div>
@@ -683,7 +778,13 @@ export default function MyCv() {
                     <input
                       value={e.field}
                       onChange={(ev) =>
-                        setEducations((list) => list.map((x) => (x.id === e.id ? { ...x, field: ev.target.value } : x)))
+                        setEducations((list) =>
+                          list.map((x) =>
+                            x.id === e.id
+                              ? { ...x, field: ev.target.value }
+                              : x,
+                          ),
+                        )
                       }
                     />
                   </div>
@@ -694,7 +795,11 @@ export default function MyCv() {
                       value={e.start_year}
                       onChange={(ev) =>
                         setEducations((list) =>
-                          list.map((x) => (x.id === e.id ? { ...x, start_year: Number(ev.target.value) } : x))
+                          list.map((x) =>
+                            x.id === e.id
+                              ? { ...x, start_year: Number(ev.target.value) }
+                              : x,
+                          ),
                         )
                       }
                     />
@@ -708,8 +813,15 @@ export default function MyCv() {
                       onChange={(ev) =>
                         setEducations((list) =>
                           list.map((x) =>
-                            x.id === e.id ? { ...x, end_year: ev.target.value ? Number(ev.target.value) : null } : x
-                          )
+                            x.id === e.id
+                              ? {
+                                  ...x,
+                                  end_year: ev.target.value
+                                    ? Number(ev.target.value)
+                                    : null,
+                                }
+                              : x,
+                          ),
                         )
                       }
                     />
@@ -721,7 +833,15 @@ export default function MyCv() {
                         checked={e.is_current}
                         onChange={(ev) =>
                           setEducations((list) =>
-                            list.map((x) => (x.id === e.id ? { ...x, is_current: ev.target.checked, end_year: null } : x))
+                            list.map((x) =>
+                              x.id === e.id
+                                ? {
+                                    ...x,
+                                    is_current: ev.target.checked,
+                                    end_year: null,
+                                  }
+                                : x,
+                            ),
                           )
                         }
                       />{" "}
@@ -733,17 +853,31 @@ export default function MyCv() {
                     <textarea
                       value={e.description}
                       onChange={(ev) =>
-                        setEducations((list) => list.map((x) => (x.id === e.id ? { ...x, description: ev.target.value } : x)))
+                        setEducations((list) =>
+                          list.map((x) =>
+                            x.id === e.id
+                              ? { ...x, description: ev.target.value }
+                              : x,
+                          ),
+                        )
                       }
                     />
                   </div>
                 </div>
-                <button type="button" className="sc-btn-outline" onClick={() => void persistEducation(e)}>
+                <button
+                  type="button"
+                  className="sc-btn-outline"
+                  onClick={() => void persistEducation(e)}
+                >
                   <Check size={14} /> Save entry
                 </button>
               </div>
             ))}
-            <button type="button" className="sc-cv-add-btn" onClick={addEducationLocal}>
+            <button
+              type="button"
+              className="sc-cv-add-btn"
+              onClick={addEducationLocal}
+            >
               <Plus size={14} /> Add education
             </button>
           </SectionWrap>
@@ -753,7 +887,11 @@ export default function MyCv() {
               <div key={x.id} className="sc-cv-entry-block">
                 <div className="sc-cv-entry-block-header">
                   <span className="sc-cv-entry-num">Entry {idx + 1}</span>
-                  <button type="button" className="sc-cv-del-btn" onClick={() => void removeExperience(x)}>
+                  <button
+                    type="button"
+                    className="sc-cv-del-btn"
+                    onClick={() => void removeExperience(x)}
+                  >
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -763,7 +901,13 @@ export default function MyCv() {
                     <input
                       value={x.job_title}
                       onChange={(ev) =>
-                        setExperiences((list) => list.map((r) => (r.id === x.id ? { ...r, job_title: ev.target.value } : r)))
+                        setExperiences((list) =>
+                          list.map((r) =>
+                            r.id === x.id
+                              ? { ...r, job_title: ev.target.value }
+                              : r,
+                          ),
+                        )
                       }
                     />
                   </div>
@@ -772,7 +916,13 @@ export default function MyCv() {
                     <input
                       value={x.company}
                       onChange={(ev) =>
-                        setExperiences((list) => list.map((r) => (r.id === x.id ? { ...r, company: ev.target.value } : r)))
+                        setExperiences((list) =>
+                          list.map((r) =>
+                            r.id === x.id
+                              ? { ...r, company: ev.target.value }
+                              : r,
+                          ),
+                        )
                       }
                     />
                   </div>
@@ -781,27 +931,45 @@ export default function MyCv() {
                     <input
                       value={x.location}
                       onChange={(ev) =>
-                        setExperiences((list) => list.map((r) => (r.id === x.id ? { ...r, location: ev.target.value } : r)))
+                        setExperiences((list) =>
+                          list.map((r) =>
+                            r.id === x.id
+                              ? { ...r, location: ev.target.value }
+                              : r,
+                          ),
+                        )
                       }
                     />
                   </div>
                   <div className="sc-form-group">
                     <label>Start date (YYYY-MM-DD)</label>
                     <input
+                      type="date"
                       value={x.start_date}
                       onChange={(ev) =>
-                        setExperiences((list) => list.map((r) => (r.id === x.id ? { ...r, start_date: ev.target.value } : r)))
+                        setExperiences((list) =>
+                          list.map((r) =>
+                            r.id === x.id
+                              ? { ...r, start_date: ev.target.value }
+                              : r,
+                          ),
+                        )
                       }
                     />
                   </div>
                   <div className="sc-form-group">
                     <label>End date</label>
                     <input
+                      type="date"
                       disabled={x.is_current}
                       value={x.end_date ?? ""}
                       onChange={(ev) =>
                         setExperiences((list) =>
-                          list.map((r) => (r.id === x.id ? { ...r, end_date: ev.target.value || null } : r))
+                          list.map((r) =>
+                            r.id === x.id
+                              ? { ...r, end_date: ev.target.value || null }
+                              : r,
+                          ),
                         )
                       }
                     />
@@ -813,7 +981,15 @@ export default function MyCv() {
                         checked={x.is_current}
                         onChange={(ev) =>
                           setExperiences((list) =>
-                            list.map((r) => (r.id === x.id ? { ...r, is_current: ev.target.checked, end_date: null } : r))
+                            list.map((r) =>
+                              r.id === x.id
+                                ? {
+                                    ...r,
+                                    is_current: ev.target.checked,
+                                    end_date: null,
+                                  }
+                                : r,
+                            ),
                           )
                         }
                       />{" "}
@@ -825,95 +1001,163 @@ export default function MyCv() {
                     <textarea
                       value={x.description}
                       onChange={(ev) =>
-                        setExperiences((list) => list.map((r) => (r.id === x.id ? { ...r, description: ev.target.value } : r)))
+                        setExperiences((list) =>
+                          list.map((r) =>
+                            r.id === x.id
+                              ? { ...r, description: ev.target.value }
+                              : r,
+                          ),
+                        )
                       }
                     />
                   </div>
                 </div>
-                <button type="button" className="sc-btn-outline" onClick={() => void persistExperience(x)}>
+                <button
+                  type="button"
+                  className="sc-btn-outline"
+                  onClick={() => void persistExperience(x)}
+                >
                   <Check size={14} /> Save entry
                 </button>
               </div>
             ))}
-            <button type="button" className="sc-cv-add-btn" onClick={addExperienceLocal}>
+            <button
+              type="button"
+              className="sc-cv-add-btn"
+              onClick={addExperienceLocal}
+            >
               <Plus size={14} /> Add experience
             </button>
           </SectionWrap>
 
           <SectionWrap icon={<Code2 size={16} />} title="Skills">
             {skills.map((s) => (
-              <div key={s.id} className="sc-skill-row-edit" style={{ marginBottom: 8 }}>
+              <div
+                key={s.id}
+                className="sc-skill-row-edit"
+                style={{ marginBottom: 8 }}
+              >
                 <input
                   className="sc-skill-name-input"
                   value={s.name}
                   placeholder="Skill"
                   onChange={(e) =>
-                    setSkills((list) => list.map((x) => (x.id === s.id ? { ...x, name: e.target.value } : x)))
+                    setSkills((list) =>
+                      list.map((x) =>
+                        x.id === s.id ? { ...x, name: e.target.value } : x,
+                      ),
+                    )
                   }
                 />
                 <select
                   value={s.level}
                   onChange={(e) =>
                     setSkills((list) =>
-                      list.map((x) => (x.id === s.id ? { ...x, level: e.target.value as SkillLevel } : x))
+                      list.map((x) =>
+                        x.id === s.id
+                          ? { ...x, level: e.target.value as SkillLevel }
+                          : x,
+                      ),
                     )
                   }
                   style={{ marginLeft: 8 }}
                 >
-                  {(["beginner", "intermediate", "advanced", "expert"] as const).map((lv) => (
+                  {(
+                    ["beginner", "intermediate", "advanced", "expert"] as const
+                  ).map((lv) => (
                     <option key={lv} value={lv}>
                       {lv}
                     </option>
                   ))}
                 </select>
-                <button type="button" className="sc-cv-del-btn" onClick={() => void removeSkill(s)}>
+                <button
+                  type="button"
+                  className="sc-cv-del-btn"
+                  onClick={() => void removeSkill(s)}
+                >
                   <Trash2 size={12} />
                 </button>
-                <button type="button" className="sc-btn-outline" style={{ marginLeft: 8 }} onClick={() => void persistSkill(s)}>
+                <button
+                  type="button"
+                  className="sc-btn-outline"
+                  style={{ marginLeft: 8 }}
+                  onClick={() => void persistSkill(s)}
+                >
                   Save
                 </button>
               </div>
             ))}
-            <button type="button" className="sc-cv-add-btn" onClick={addSkillLocal}>
+            <button
+              type="button"
+              className="sc-cv-add-btn"
+              onClick={addSkillLocal}
+            >
               <Plus size={14} /> Add skill
             </button>
           </SectionWrap>
 
           <SectionWrap icon={<Globe size={16} />} title="Languages">
             {languages.map((l) => (
-              <div key={l.id} className="sc-skill-row-edit" style={{ marginBottom: 8 }}>
+              <div
+                key={l.id}
+                className="sc-skill-row-edit"
+                style={{ marginBottom: 8 }}
+              >
                 <input
                   className="sc-skill-name-input"
                   value={l.name}
                   placeholder="Language"
                   onChange={(e) =>
-                    setLanguages((list) => list.map((x) => (x.id === l.id ? { ...x, name: e.target.value } : x)))
+                    setLanguages((list) =>
+                      list.map((x) =>
+                        x.id === l.id ? { ...x, name: e.target.value } : x,
+                      ),
+                    )
                   }
                 />
                 <select
                   value={l.level}
                   onChange={(e) =>
                     setLanguages((list) =>
-                      list.map((x) => (x.id === l.id ? { ...x, level: e.target.value as LangLevel } : x))
+                      list.map((x) =>
+                        x.id === l.id
+                          ? { ...x, level: e.target.value as LangLevel }
+                          : x,
+                      ),
                     )
                   }
                   style={{ marginLeft: 8 }}
                 >
-                  {(["A1", "A2", "B1", "B2", "C1", "C2", "native"] as const).map((lv) => (
+                  {(
+                    ["A1", "A2", "B1", "B2", "C1", "C2", "native"] as const
+                  ).map((lv) => (
                     <option key={lv} value={lv}>
                       {lv}
                     </option>
                   ))}
                 </select>
-                <button type="button" className="sc-cv-del-btn" onClick={() => void removeLanguage(l)}>
+                <button
+                  type="button"
+                  className="sc-cv-del-btn"
+                  onClick={() => void removeLanguage(l)}
+                >
                   <Trash2 size={12} />
                 </button>
-                <button type="button" className="sc-btn-outline" style={{ marginLeft: 8 }} onClick={() => void persistLanguage(l)}>
+                <button
+                  type="button"
+                  className="sc-btn-outline"
+                  style={{ marginLeft: 8 }}
+                  onClick={() => void persistLanguage(l)}
+                >
                   Save
                 </button>
               </div>
             ))}
-            <button type="button" className="sc-cv-add-btn" onClick={addLangLocal}>
+            <button
+              type="button"
+              className="sc-cv-add-btn"
+              onClick={addLangLocal}
+            >
               <Plus size={14} /> Add language
             </button>
           </SectionWrap>
@@ -923,7 +1167,11 @@ export default function MyCv() {
       {tab === "preview" && (
         <div className="sc-cv-preview-tab">
           <div className="sc-cv-preview-actions">
-            <button type="button" className="sc-btn-outline" onClick={() => setTab("edit")}>
+            <button
+              type="button"
+              className="sc-btn-outline"
+              onClick={() => setTab("edit")}
+            >
               <Edit3 size={14} /> Edit
             </button>
           </div>

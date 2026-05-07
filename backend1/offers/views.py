@@ -54,7 +54,14 @@ def admin_patch_offer_status(request, id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_offers(request):
-    offers     = InternshipOffer.objects.filter(status='open').select_related('company', 'company__user')
+    from django.utils import timezone
+    # Auto-close expired offers
+    InternshipOffer.objects.filter(
+        status='open',
+        deadline__lt=timezone.now().date()
+    ).update(status='closed')
+    
+    offers = InternshipOffer.objects.filter(status='open').select_related('company', 'company__user').order_by('-date_posted')
     serializer = OfferSerializer(offers, many=True)
     return Response(serializer.data)
 

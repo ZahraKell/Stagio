@@ -25,6 +25,10 @@ def is_admin(user):
 # ══ USER MANAGEMENT ═══════════════════════════════════════════════════════════
 
 # GET /api/admin/users/?role=student
+# users/admin_views.py — list_users function, update the company query
+from django.db.models import Count
+
+# When role == 'company', annotate with counts:
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_users(request):
@@ -34,12 +38,23 @@ def list_users(request):
     users = User.objects.all().order_by('role', 'username')
     if role_filter:
         users = users.filter(role=role_filter.lower())
-    data = [
-        {'id': u.pk, 'username': u.username, 'email': u.email,
-         'full_name': u.full_name, 'role': u.role,
-         'is_active': u.is_active, 'town': u.town}
-        for u in users
-    ]
+    
+    data = []
+    for u in users:
+        row = {'id': u.pk, 'username': u.username, 'email': u.email,
+               'full_name': u.full_name, 'role': u.role,
+               'is_active': u.is_active, 'town': u.town}
+        if u.role == 'company':
+            try:
+                c = u.company
+                row['offers_count'] = c.internshipoffer_set.count()
+                row['conventions_count'] = c.internshipoffer_set.aggregate(
+                    total=Count('applications__convention')
+                )['total'] or 0
+            except Exception:
+                row['offers_count'] = 0
+                row['conventions_count'] = 0
+        data.append(row)
     return ok(data=data, message=f"{len(data)} user(s) found.")
 
 

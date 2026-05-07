@@ -6,6 +6,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.conf import settings
+from django.utils import timezone
 from .serializers import RegisterSerializer, UserSerializer
 from .models import SignupOTP, Company
 from notifications.models import Notification
@@ -317,19 +318,20 @@ def google_login(request):
                 student_number=f"STU{user.id:04d}"
             )
         elif role == 'company':
-            from .models import Company
-            Company.objects.create(
-                user=user,
-                is_approved=False,
-                is_rejected=False,
-            )
-            # Notify admins about new company
-            admin_users = User.objects.filter(role='admin', is_active=True)
-            for admin in admin_users:
-                Notification.objects.create(
-                    recipient=admin,
-                    message=f"New company registration via Google: {email}",
-                )
+           from .models import Company
+           Company.objects.create(
+            user=user,
+            is_approved=False,
+            is_rejected=False,
+            submitted_at=timezone.now(),   # ← ADD: marks it as submitted
+ )
+    # Notify admins about new company
+    admin_users = User.objects.filter(role='admin', is_active=True)
+    for admin in admin_users:
+        Notification.objects.create(
+            recipient=admin,
+            message=f"New company registration via Google: {email}",
+        )
 
     # ── Step 4: Generate JWT tokens and return them ───────────────────────────
     refresh = RefreshToken.for_user(user)

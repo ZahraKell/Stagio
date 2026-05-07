@@ -8,6 +8,7 @@ import HomePage from "./HomePage";
 import ContactPage from "./ContactPage";
 import AboutPage from "./AboutPage";
 import AuthPage from "./AuthPage";
+import ForgotPasswordPage from "./ForgotPasswordPage";   // ← ADD THIS
 import CompanyHome from "./Company/CompanyHome";
 import CompanyOffers from "./Company/CompanyOffers";
 import CompanyDetails from "./Company/CompanyDetails";
@@ -50,6 +51,7 @@ import ADMStudentpage from './Administration/ADMStudentpage';
 import ADMAplicationspage from './Administration/ADMAplicationspage';
 import ADMCompaniesPage from './Administration/ADMCompaniespage';
 import ADMProfile from './Administration/ADMProfilepage';
+import ADMReports from './Administration/ADMReports';
 import PrivateRoute from "./PrivateRoute";
 
 createRoot(document.getElementById('root')!).render(
@@ -68,6 +70,7 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/auth" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/login/roles" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />  {/* ← ADD THIS */}
 
         <Route path="/student" element={<PrivateRoute role="student"><StudentDashboard /></PrivateRoute>} />
         <Route path="/student/courses" element={<PrivateRoute role="student"><CoursesPage /></PrivateRoute>} />
@@ -95,6 +98,7 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/administration/applications" element={<PrivateRoute role="administration"><ADMAplicationspage /></PrivateRoute>} />
         <Route path="/administration/companies" element={<PrivateRoute role="administration"><ADMCompaniesPage /></PrivateRoute>} />
         <Route path="/administration/settings" element={<PrivateRoute role="administration"><SettingsPage /></PrivateRoute>} />
+        <Route path="/administration/reports" element={<PrivateRoute role="administration"><ADMReports /></PrivateRoute>} />
         <Route path="/administration/help" element={<PrivateRoute role="administration"><HelpCenterPage /></PrivateRoute>} />
 
         <Route path="/admin" element={<PrivateRoute role="admin"><AdminLayout /></PrivateRoute>}>

@@ -4,7 +4,7 @@ import CompanyLayout from "../components/CompanyLayout";
 import api from "../api";
 import toast from "react-hot-toast";
 
-// ”€”€ TYPES ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── TYPES ──────────────────────────────────────────────────────────────────
 interface Intern {
   application_id: number;
   student_name: string;
@@ -21,9 +21,10 @@ interface Intern {
   convention_status: string | null;
   status?: string;
   stage_state?: string;
+  report_file?: string | null;
 }
 
-// ”€”€ STAGE CONFIG ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── STAGE CONFIG ───────────────────────────────────────────────────────────
 const STAGE_CONFIG = {
   pending_convention: {
     label: "En attente",
@@ -67,13 +68,177 @@ const STAGE_CONFIG = {
   },
 };
 
-// ”€”€ INTERN CARD ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── REPORT POPUP (Fix 1: broken <a> tag fixed) ────────────────────────────
+function ReportPopup({
+  intern,
+  onClose,
+  onValidated,
+}: {
+  intern: Intern;
+  onClose: () => void;
+  onValidated: () => void;
+}) {
+  const [validating, setValidating] = useState(false);
+  const [done, setDone] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState("");
+
+  const reportUrl = `http://127.0.0.1:8000/media/${intern.report_file}`;
+
+  const handleValidate = async () => {
+    setValidating(true);
+    setError("");
+    try {
+      await api.post(`applications/${intern.application_id}/validate-report/`);
+      setDone(true);
+      setTimeout(onValidated, 1800);
+    } catch {
+      setError("Échec de la validation. Réessayez.");
+      setValidating(false);
+    }
+  };
+
+  return (
+    <div
+      className="conv-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="conv-popup" style={{ maxWidth: 600, width: "95%" }}>
+        {/* Header */}
+        <div className="conv-head">
+          <div className="conv-head-icon">📄</div>
+          <div>
+            <h3>Rapport de Stage</h3>
+            <p>
+              {intern.student_name} — {intern.offer_title}
+            </p>
+          </div>
+          {!done && (
+            <button className="conv-close" onClick={onClose}>
+              ✕
+            </button>
+          )}
+        </div>
+
+        {done ? (
+          <div className="conv-success">
+            <div className="conv-success-icon">✅</div>
+            <h3>Rapport validé !</h3>
+            <p>
+              L'administration universitaire sera notifiée pour émettre
+              l'attestation de stage.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="conv-body">
+              {/* Summary */}
+              <div className="conv-summary">
+                <div className="conv-summary-item">
+                  <span>Stagiaire</span>
+                  <strong>{intern.student_name}</strong>
+                </div>
+                <div className="conv-summary-item">
+                  <span>Poste</span>
+                  <strong>{intern.offer_title}</strong>
+                </div>
+              </div>
+
+              {/* PDF Preview — Fix 1: <a> tag is now correct */}
+              <div style={{ margin: "12px 0" }}>
+                <p
+                  style={{
+                    fontSize: ".8rem",
+                    color: "#64748b",
+                    marginBottom: 8,
+                    fontWeight: 600,
+                  }}
+                >
+                  📎 Rapport soumis par l'étudiant :
+                </p>
+                <div
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    height: 320,
+                  }}
+                >
+                  <iframe
+                    src={reportUrl}
+                    width="100%"
+                    height="320"
+                    style={{ border: "none" }}
+                    title="Rapport de stage"
+                  />
+                </div>
+                <a
+                  href={reportUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-block",
+                    marginTop: 8,
+                    fontSize: ".75rem",
+                    color: "#3b82f6",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Ouvrir dans un nouvel onglet ↗
+                </a>
+              </div>
+
+              {/* Checkbox */}
+              <label className="conv-agree">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                />
+                <span className="conv-check-box" />
+                <span>
+                  J'ai lu le rapport et je confirme qu'il est conforme au stage
+                  effectué.
+                </span>
+              </label>
+
+              {error && <div className="conv-error">{error}</div>}
+            </div>
+
+            <div className="conv-footer">
+              <button className="conv-btn-cancel" onClick={onClose}>
+                Fermer
+              </button>
+              <button
+                className={`conv-btn-sign ${agreed ? "conv-btn-sign-ready" : ""}`}
+                disabled={!agreed || validating}
+                onClick={() => void handleValidate()}
+              >
+                {validating
+                  ? "Validation en cours…"
+                  : agreed
+                    ? "✅ Valider le rapport"
+                    : "Lisez et cochez pour valider"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── INTERN CARD ────────────────────────────────────────────────────────────
 function InternCard({
   intern,
   onSignConvention,
+  onValidateReport,
 }: {
   intern: Intern;
   onSignConvention: (intern: Intern) => void;
+  onValidateReport: (intern: Intern) => void;  // Fix 3: accepts Intern not void
 }) {
   const cfg = STAGE_CONFIG[intern.stage] ?? STAGE_CONFIG.pending_convention;
   const initial = intern.student_name.charAt(0).toUpperCase();
@@ -157,7 +322,7 @@ function InternCard({
         </div>
       </div>
 
-      {/* Card footer — action */}
+      {/* Card footer */}
       <div className="mi-card-footer">
         {intern.stage === "convention_to_sign" && (
           <button
@@ -173,11 +338,22 @@ function InternCard({
             En attente des autres signatures…
           </div>
         )}
-        {intern.stage === "ongoing" && (
-          <div className="mi-ongoing-msg">
-            🎓 Stage en cours — Rapport attendu en fin de stage
-          </div>
-        )}
+        {intern.stage === "ongoing" &&
+          intern.stage_state !== "report_to_validate" && (
+            <div className="mi-ongoing-msg">
+              🎓 Stage en cours — Rapport attendu en fin de stage
+            </div>
+          )}
+        {intern.stage === "ongoing" &&
+          intern.stage_state === "report_to_validate" && (
+            <button
+              className="mi-action-btn mi-sign-btn"
+              style={{ background: "#f59e0b" }}
+              onClick={() => onValidateReport(intern)}
+            >
+              📄 Valider le rapport de stage
+            </button>
+          )}
         {intern.stage === "completed" && (
           <div className="mi-done-msg">✅ Stage terminé avec succès</div>
         )}
@@ -192,7 +368,7 @@ function InternCard({
   );
 }
 
-// ”€”€ CONVENTION SIGN POPUP ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── CONVENTION SIGN POPUP ──────────────────────────────────────────────────
 function ConventionPopup({
   intern,
   onClose,
@@ -212,7 +388,8 @@ function ConventionPopup({
     setSigning(true);
     setError("");
     try {
-      if (intern.convention_id == null) throw new Error("Convention manquante.");
+      if (intern.convention_id == null)
+        throw new Error("Convention manquante.");
       await api.post(`conventions/${intern.convention_id}/sign/`, {});
       setDone(true);
       setTimeout(onSigned, 1800);
@@ -245,7 +422,6 @@ function ConventionPopup({
         </div>
 
         {done ? (
-          /* Success state */
           <div className="conv-success">
             <div className="conv-success-icon">✅</div>
             <h3>Convention signée !</h3>
@@ -256,7 +432,6 @@ function ConventionPopup({
           </div>
         ) : (
           <>
-            {/* Convention summary */}
             <div className="conv-body">
               <div className="conv-summary">
                 <div className="conv-summary-item">
@@ -275,9 +450,8 @@ function ConventionPopup({
                 </div>
               </div>
 
-              {/* Explanation */}
               <div className="conv-explainer">
-                <div className="conv-explainer-icon">ℹï¸</div>
+                <div className="conv-explainer-icon">ℹ️</div>
                 <p>
                   En signant cette convention, vous confirmez en tant que
                   représentant de l'entreprise que vous acceptez d'accueillir{" "}
@@ -288,7 +462,6 @@ function ConventionPopup({
                 </p>
               </div>
 
-              {/* Signature chain */}
               <div className="conv-chain">
                 <div className="conv-chain-step conv-chain-done">
                   <span className="conv-chain-dot">✓</span>
@@ -306,7 +479,6 @@ function ConventionPopup({
                 </div>
               </div>
 
-              {/* Agreement checkbox */}
               <label className="conv-agree">
                 <input
                   type="checkbox"
@@ -323,7 +495,6 @@ function ConventionPopup({
               {error && <div className="conv-error">{error}</div>}
             </div>
 
-            {/* Footer */}
             <div className="conv-footer">
               <button className="conv-btn-cancel" onClick={onClose}>
                 Plus tard
@@ -331,7 +502,7 @@ function ConventionPopup({
               <button
                 className={`conv-btn-sign ${agreed ? "conv-btn-sign-ready" : ""}`}
                 disabled={!agreed || signing}
-                onClick={handleSign}
+                onClick={() => void handleSign()}
               >
                 {signing
                   ? "Signature en cours…"
@@ -347,7 +518,7 @@ function ConventionPopup({
   );
 }
 
-// ”€”€ MAIN PAGE ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+// ── MAIN PAGE ──────────────────────────────────────────────────────────────
 export default function MyInterns() {
   const [interns, setInterns] = useState<Intern[]>([]);
   const [loading, setLoading] = useState(true);
@@ -355,6 +526,7 @@ export default function MyInterns() {
     "all" | "convention_to_sign" | "ongoing" | "completed"
   >("all");
   const [signTarget, setSignTarget] = useState<Intern | null>(null);
+  const [reportTarget, setReportTarget] = useState<Intern | null>(null); // Fix 2 & 4
 
   useEffect(() => {
     (async () => {
@@ -406,15 +578,24 @@ export default function MyInterns() {
     setInterns((prev) =>
       prev.map((i) =>
         i.application_id === signTarget.application_id
-          ? {
-              ...i,
-              stage: "convention_pending",
-              convention_status: "PENDING_ADMIN",
-            }
+          ? { ...i, stage: "convention_pending", convention_status: "PENDING_ADMIN" }
           : i,
       ),
     );
     setSignTarget(null);
+  };
+
+  // Fix 2: replaced direct API call with state-based handler
+  const handleReportValidated = () => {
+    if (!reportTarget) return;
+    setInterns((prev) =>
+      prev.map((i) =>
+        i.application_id === reportTarget.application_id
+          ? { ...i, stage_state: "report_validated" }
+          : i,
+      ),
+    );
+    setReportTarget(null);
   };
 
   return (
@@ -429,8 +610,6 @@ export default function MyInterns() {
               l'attestation
             </p>
           </div>
-
-          {/* Quick action badge */}
           {counts.convention_to_sign > 0 && (
             <div className="mi-urgent-badge">
               <span>✍️</span>
@@ -443,30 +622,10 @@ export default function MyInterns() {
         {/* Stats row */}
         <div className="mi-stats-row">
           {[
-            {
-              label: "Total",
-              val: interns.length,
-              icon: "👥",
-              color: "#3b82f6",
-            },
-            {
-              label: "À signer",
-              val: counts.convention_to_sign,
-              icon: "✍️",
-              color: "#f59e0b",
-            },
-            {
-              label: "En cours",
-              val: counts.ongoing,
-              icon: "🎓",
-              color: "#22c55e",
-            },
-            {
-              label: "Terminés",
-              val: counts.completed,
-              icon: "✅",
-              color: "#64748b",
-            },
+            { label: "Total",    val: interns.length,              icon: "👥", color: "#3b82f6" },
+            { label: "À signer", val: counts.convention_to_sign,   icon: "✍️", color: "#f59e0b" },
+            { label: "En cours", val: counts.ongoing,              icon: "🎓", color: "#22c55e" },
+            { label: "Terminés", val: counts.completed,            icon: "✅", color: "#64748b" },
           ].map((s) => (
             <div
               key={s.label}
@@ -480,35 +639,13 @@ export default function MyInterns() {
           ))}
         </div>
 
-        {/* Pipeline flow diagram */}
+        {/* Pipeline */}
         <div className="mi-pipeline">
           {[
-            {
-              stage: "convention_to_sign",
-              icon: "✍️",
-              label: "Convention\nà signer",
-              count: interns.filter((i) => i.stage === "convention_to_sign")
-                .length,
-            },
-            {
-              stage: "convention_pending",
-              icon: "📄",
-              label: "Convention\nen attente",
-              count: interns.filter((i) => i.stage === "convention_pending")
-                .length,
-            },
-            {
-              stage: "ongoing",
-              icon: "🎓",
-              label: "Stage\nen cours",
-              count: interns.filter((i) => i.stage === "ongoing").length,
-            },
-            {
-              stage: "completed",
-              icon: "🏆",
-              label: "Stage\nterminé",
-              count: interns.filter((i) => i.stage === "completed").length,
-            },
+            { stage: "convention_to_sign", icon: "✍️", label: "Convention\nà signer",    count: interns.filter((i) => i.stage === "convention_to_sign").length },
+            { stage: "convention_pending", icon: "📄", label: "Convention\nen attente",  count: interns.filter((i) => i.stage === "convention_pending").length },
+            { stage: "ongoing",            icon: "🎓", label: "Stage\nen cours",         count: interns.filter((i) => i.stage === "ongoing").length },
+            { stage: "completed",          icon: "🏆", label: "Stage\nterminé",          count: interns.filter((i) => i.stage === "completed").length },
           ].map((p, i) => (
             <div key={p.stage} className="mi-pipeline-row">
               <div className="mi-pipeline-step">
@@ -529,10 +666,10 @@ export default function MyInterns() {
         <div className="mi-tabs">
           {(
             [
-              ["all", "Tous", counts.all],
-              ["convention_to_sign", "À signer", counts.convention_to_sign],
-              ["ongoing", "En cours", counts.ongoing],
-              ["completed", "Terminés", counts.completed],
+              ["all",                "Tous",      counts.all],
+              ["convention_to_sign", "À signer",  counts.convention_to_sign],
+              ["ongoing",            "En cours",  counts.ongoing],
+              ["completed",          "Terminés",  counts.completed],
             ] as const
           ).map(([key, label, count]) => (
             <button
@@ -571,11 +708,13 @@ export default function MyInterns() {
         {!loading && filtered.length > 0 && (
           <div className="mi-grid">
             {filtered.map((intern, i) => (
-              <div
-                key={intern.application_id}
-                style={{ animationDelay: `${i * 60}ms` }}
-              >
-                <InternCard intern={intern} onSignConvention={setSignTarget} />
+              <div key={intern.application_id} style={{ animationDelay: `${i * 60}ms` }}>
+                {/* Fix 3: onValidateReport now uses setReportTarget */}
+                <InternCard
+                  intern={intern}
+                  onSignConvention={setSignTarget}
+                  onValidateReport={setReportTarget}
+                />
               </div>
             ))}
           </div>
@@ -590,8 +729,15 @@ export default function MyInterns() {
           onSigned={handleSigned}
         />
       )}
+
+      {/* Fix 4: Report validation popup is now rendered */}
+      {reportTarget && (
+        <ReportPopup
+          intern={reportTarget}
+          onClose={() => setReportTarget(null)}
+          onValidated={handleReportValidated}
+        />
+      )}
     </CompanyLayout>
   );
 }
-
-

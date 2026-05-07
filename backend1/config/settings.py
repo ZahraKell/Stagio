@@ -30,7 +30,7 @@ INSTALLED_APPS = [
     'users',
     'offers',
     'applications.apps.ApplicationsConfig',
-    'conventions',
+    'conventions.apps.ConventionsConfig',  
     'notifications',
     'courses',
 ]
@@ -69,14 +69,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'stagio_db'),
-        'USER': os.getenv('DB_USER', 'postgres'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
-        'OPTIONS': {
-            'client_encoding': 'UTF8',  # ← this fixes the UTF-8 crash
-        },
+        'NAME': config('DB_NAME', default='stagio_db'),
+        'USER': config('DB_USER', default='postgres'),
+        'PASSWORD': config('DB_PASSWORD', default='postgres'),
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='5432', cast=int),
     }
 }
 
@@ -136,3 +133,4 @@ EMAIL_HOST_USER     = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL  = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID')
+YOUTUBE_API_KEY = config('YOUTUBE_API_KEY')

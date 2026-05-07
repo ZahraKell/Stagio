@@ -144,7 +144,7 @@ export default function CompanyHome() {
                 offer: String(row.offer_title ?? ""),
                 status: String(row.status ?? "pending").toLowerCase(),
                 date: String(row.application_date ?? "").split("T")[0],
-                cv_score: 0,
+                cv_score: Number((row.cv_score as number) ?? 0),
               })),
             );
           } else setRecent([]);
@@ -400,7 +400,7 @@ export default function CompanyHome() {
                       <td><StatusBadge status={app.status} /></td>
                       <td><span className="ch-date">{app.date}</span></td>
                       <td>
-                        <Link to={`/company/applications/${app.id}`} className="ch-view-btn">
+                        <Link to={`/company/offers`} className="ch-view-btn">
                           Voir
                         </Link>
                       </td>

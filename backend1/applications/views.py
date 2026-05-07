@@ -40,6 +40,11 @@ def ensure_company_is_approved(user):
             status.HTTP_403_FORBIDDEN
         )
     return None
+def _get_convention(application):
+    try:
+        return application.convention
+    except Exception:
+        return None
 
 
 # ── VIEW 1: SUBMIT APPLICATION ─────────────────────────────────────────────────
@@ -156,6 +161,12 @@ class OfferApplicationsView(APIView):
         filter_status = request.query_params.get("status")
         applications  = Application.objects.filter(offer=offer).select_related(
             "student", "student__user", "offer"
+            ).prefetch_related(
+        "student__digital_cv",
+        "student__digital_cv__skills",
+        "student__digital_cv__educations",
+        "student__digital_cv__experiences",
+        "student__digital_cv__languages",
         ).order_by("-application_date")
         if filter_status:
             applications = applications.filter(status=filter_status.lower())
@@ -371,7 +382,7 @@ def validate_internship(request, pk):
     # Keep Convention and Application workflow aligned.
     try:
         from conventions.models import Convention
-        convention = getattr(application, 'convention', None)
+        convention = _get_convention(application)
         if convention:
             convention.status = Convention.Status.VALIDATED
             convention.admin_signed_at = timezone.now()
@@ -468,7 +479,7 @@ def _send_validation_email(application):
             to=[student_email],
         )
         # Generate and attach Convention PDF if available.
-        convention = getattr(application, 'convention', None)
+        convention = _get_convention(application)
         if convention:
             rel_path = generate_convention_pdf(convention)
             abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
@@ -523,7 +534,7 @@ def reject_internship(request, pk):
         return Response({'error': f"Status must be 'accepted'. Current: '{application.status}'."}, status=400)
 
     reason             = request.data.get('reason', 'No reason provided.')
-    application.status = Application.Status.PENDING
+    application.status = Application.Status.REFUSED
     application.save(update_fields=['status'])
 
     Notification.objects.create(
@@ -744,6 +755,26 @@ def company_stats(request):
         'validated': apps.filter(status=Application.Status.VALIDATED).count(),
     })
 
+def _compute_cv_score(student):
+    """Compute CV score dynamically — mirrors cv_score view logic."""
+    score = 0
+    if student.user.full_name: score += 10
+    if student.user.pnum:      score += 5
+    if student.institution:    score += 10
+    if student.grade:          score += 5
+    try:
+        cv = student.digital_cv
+        if cv.github or cv.linkedin or cv.portfolio: score += 10
+        if cv.description:   score += 5
+        if cv.educations.count() > 0:  score += 15
+        if cv.experiences.count() > 0: score += 15
+        skill_count = cv.skills.count()
+        if skill_count >= 3:   score += 20
+        elif skill_count > 0:  score += 10
+        if cv.languages.count() > 0: score += 5
+    except Exception:
+        pass
+    return min(score, 100)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -753,14 +784,24 @@ def company_recent(request):
     company = request.user.company
     recent = Application.objects.filter(
         offer__company=company
-    ).select_related('student__user', 'offer').order_by('-application_date')[:10]
+    ).select_related(
+        'student__user', 'offer',
+        'student__digital_cv',        # ← prefetch CV
+    ).prefetch_related(
+        'student__digital_cv__skills',      # ← prefetch skills count
+        'student__digital_cv__educations',  # ← prefetch edu count
+        'student__digital_cv__experiences', # ← prefetch exp count
+        'student__digital_cv__languages',   # ← prefetch lang count
+    ).order_by('-application_date')[:10]
+
     data = [{
-        'application_id': a.pk,
-        'student_name': a.student.user.full_name,
-        'offer_title': a.offer.title,
-        'status': a.status,
-        'stage_state': a.stage_state,
+        'application_id':   a.pk,
+        'student_name':     a.student.user.full_name,
+        'offer_title':      a.offer.title,
+        'status':           a.status,
+        'stage_state':      a.stage_state,
         'application_date': a.application_date.isoformat(),
+        'cv_score':         _compute_cv_score(a.student),  # ← computed live
     } for a in recent]
     return ok(data=data)
 
@@ -941,4 +982,60 @@ def issue_attestation(request, pk):
         recipient=application.offer.company.user,
         message=f"Administration issued attestation for intern {application.student.user.full_name}."
     )
+    _send_attestation_email(application)
     return ok(message="Attestation issued successfully.")
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def download_attestation(request, pk):
+    if request.user.role != 'student':
+        return fail("Students only.", status.HTTP_403_FORBIDDEN)
+    application = get_object_or_404(
+        Application.objects.select_related('student__user'),
+        pk=pk,
+        student=request.user.student,
+    )
+    if not application.attestation_file:
+        return fail("Attestation not yet issued.", status.HTTP_404_NOT_FOUND)
+
+    abs_path = application.attestation_file.path
+    if not os.path.exists(abs_path):
+        return fail("Attestation file not found on server.", status.HTTP_404_NOT_FOUND)
+
+    from django.http import FileResponse
+    return FileResponse(
+        open(abs_path, "rb"),
+        content_type="application/pdf",
+        as_attachment=True,
+        filename=f"attestation_{pk}.pdf",
+    )
+def _send_attestation_email(application):
+    from django.core.mail import EmailMessage
+    student_email = application.student.user.email
+    if not student_email:
+        return
+    try:
+        msg = EmailMessage(
+            subject=f"[Stag.io] Attestation de stage — {application.offer.title}",
+            body=(
+                f"Bonjour {application.student.user.full_name},\n\n"
+                f"Votre attestation de stage pour le poste '{application.offer.title}' "
+                f"chez {application.offer.company.company_name or application.offer.company.user.full_name} "
+                f"a été émise par l'administration universitaire.\n\n"
+                f"Vous pouvez la télécharger depuis la plateforme Stag.io.\n\n"
+                f"Félicitations !\n"
+                f"L'équipe Stag.io"
+            ),
+            to=[student_email],
+        )
+        if application.attestation_file:
+            abs_path = application.attestation_file.path
+            if os.path.exists(abs_path):
+                with open(abs_path, "rb") as f:
+                    msg.attach(
+                        f"attestation_{application.pk}.pdf",
+                        f.read(),
+                        "application/pdf",
+                    )
+        msg.send()
+    except Exception:
+        pass  # never break the flow
