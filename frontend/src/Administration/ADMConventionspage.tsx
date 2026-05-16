@@ -58,7 +58,7 @@ type PendingConventionApiRow = {
     updated_at: string;
 };
 
-/** Map Django pending conventions into the drawer/list shape used here. UI uses legacy mock ConvStatus semantics. */
+/** Map Django pending conventions into the drawer/list shape used here. */
 function mapPendingConventionRow(row: PendingConventionApiRow): Convention {
     return {
         id: `CV-${String(row.id).padStart(4, '0')}`,
@@ -83,6 +83,9 @@ function mapPendingConventionRow(row: PendingConventionApiRow): Convention {
     };
 }
 
+/* ══════════════════════════════════════════════════════════════
+   CONFIG
+   ══════════════════════════════════════════════════════════════ */
 
 const STATUS_CONFIG: Record<ConvStatus, {
     label: string; shortLabel: string; cls: string;
@@ -124,6 +127,9 @@ const nextStepLabel = (status: ConvStatus): string | null => {
     return STATUS_CONFIG[PIPELINE[idx + 1]].label;
 };
 
+/* ══════════════════════════════════════════════════════════════
+   SUB-COMPONENTS
+   ══════════════════════════════════════════════════════════════ */
 
 /* ── Mini pipeline dots shown on each card ── */
 const MiniPipeline: React.FC<{ status: ConvStatus }> = ({ status }) => {
@@ -235,7 +241,6 @@ const ConventionDrawer: React.FC<{
     const next = nextStepLabel(c.status);
     const canAdvance = c.status !== 'complete' && c.status !== 'expired';
 
-    // Reset confirm whenever a different convention is opened
     React.useEffect(() => { setConfirmOpen(false); }, [c.id]);
 
     return (
@@ -361,6 +366,9 @@ const ConventionDrawer: React.FC<{
     );
 };
 
+/* ══════════════════════════════════════════════════════════════
+   MAIN PAGE
+   ══════════════════════════════════════════════════════════════ */
 
 const ConventionsPage: React.FC = () => {
     const [conventions, setConventions] = useState<Convention[]>([]);
@@ -369,6 +377,7 @@ const ConventionsPage: React.FC = () => {
     const [selected, setSelected] = useState<Convention | null>(null);
     const [advancing, setAdvancing] = useState(false);
 
+    /* ── Load from API ── */
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -377,7 +386,9 @@ const ConventionsPage: React.FC = () => {
                     'conventions/pending-admin/'
                 );
                 const rows =
-                    res.data?.error === true ? [] : (res.data?.data as PendingConventionApiRow[] | undefined) ?? [];
+                    res.data?.error === true
+                        ? []
+                        : (res.data?.data as PendingConventionApiRow[] | undefined) ?? [];
                 if (!cancelled) setConventions(rows.map(mapPendingConventionRow));
             } catch {
                 if (!cancelled) {
@@ -386,9 +397,7 @@ const ConventionsPage: React.FC = () => {
                 }
             }
         })();
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, []);
 
     /* ── Filtered list ── */
@@ -406,7 +415,7 @@ const ConventionsPage: React.FC = () => {
 
     const tabCount = (tab: Tab) => conventions.filter(c => tabMatch(tab, c.status)).length;
 
-    /* ── Advance pipeline status ── */
+    /* ── Advance pipeline status via API ── */
     const handleAdvance = async () => {
         if (!selected) return;
 
@@ -420,7 +429,7 @@ const ConventionsPage: React.FC = () => {
         try {
             await api.post(`conventions/${apiPk}/sign/`);
             toast.success('Convention validated by administration.');
-            setConventions((prev) => prev.filter((c) => c.id !== selected.id));
+            setConventions(prev => prev.filter(c => c.id !== selected.id));
             setSelected(null);
         } catch {
             toast.error('Unable to validate convention.');
@@ -429,7 +438,7 @@ const ConventionsPage: React.FC = () => {
         }
     };
 
-    // Keep drawer in sync after status update
+    /* ── Keep drawer in sync after status update ── */
     React.useEffect(() => {
         if (!selected) return;
         const updated = conventions.find(c => c.id === selected.id);
@@ -437,8 +446,8 @@ const ConventionsPage: React.FC = () => {
     }, [conventions]);
 
     return (
-        <DashboardLayout pageTitle="Conventions"
-        >
+        <DashboardLayout pageTitle="Conventions">
+
             {/* ── Status summary strip ── */}
             <div className="cv-summary-strip">
                 {(Object.keys(STATUS_CONFIG) as ConvStatus[])
@@ -518,12 +527,13 @@ const ConventionsPage: React.FC = () => {
                             key={selected.id}
                             convention={selected}
                             onClose={() => setSelected(null)}
-                            onAdvance={handleAdvance}
+                            onAdvance={() => void handleAdvance()}
                             advancing={advancing}
                         />
                     )}
                 </AnimatePresence>
             </div>
+
         </DashboardLayout>
     );
 };

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
 import DashboardLayout from "../components/DashboardLayout";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
   Download,
@@ -13,6 +14,8 @@ import {
   Building2,
   MapPin,
   Calendar,
+  ChevronRight,
+  X,
   Briefcase,
 } from "lucide-react";
 
@@ -105,69 +108,55 @@ function mapRow(row: ApiMyApplicationRow): Application {
 }
 
 /* ══════════════════════════════════════════════════════════
-   STATUS CONFIG — matches MyInterns STAGE_CONFIG style
+   STATUS CONFIG
    ══════════════════════════════════════════════════════════ */
-const STATUS_CONFIG: Record<
+const statusConfig: Record<
   AppStatus,
-  {
-    label: string;
-    color: string;
-    bg: string;
-    border: string;
-    icon: string;
-    desc: string;
-  }
+  { label: string; badgeClass: string; icon: React.ReactNode; color: string }
 > = {
-  pending: {
-    label: "En attente",
-    color: "#f59e0b",
-    bg: "#fffbeb",
-    border: "#fde68a",
-    icon: "⏳",
-    desc: "Candidature soumise",
-  },
-  review: {
-    label: "En révision",
-    color: "#8b5cf6",
-    bg: "#f5f3ff",
-    border: "#ddd6fe",
-    icon: "🔍",
-    desc: "Examinée par l'entreprise",
-  },
-  accepted: {
-    label: "Acceptée",
-    color: "#22c55e",
-    bg: "#f0fdf4",
-    border: "#bbf7d0",
-    icon: "✅",
-    desc: "Candidature acceptée",
-  },
-  rejected: {
-    label: "Refusée",
-    color: "#ef4444",
-    bg: "#fef2f2",
-    border: "#fecaca",
-    icon: "❌",
-    desc: "Non retenu",
-  },
-  validated: {
-    label: "Validée",
-    color: "#3b82f6",
-    bg: "#eff6ff",
-    border: "#bfdbfe",
-    icon: "🏆",
-    desc: "Stage validé",
-  },
+  pending: { label: "Pending", badgeClass: "sc-badge-pending", icon: <Clock size={14} />, color: "var(--sc-warn)" },
+  review: { label: "In Review", badgeClass: "sc-badge-review", icon: <AlertCircle size={14} />, color: "var(--sc-purple)" },
+  accepted: { label: "Accepted", badgeClass: "sc-badge-accepted", icon: <CheckCircle2 size={14} />, color: "var(--sc-green)" },
+  validated: { label: "Validated", badgeClass: "sc-badge-validated", icon: <CheckCircle2 size={14} />, color: "var(--sc-blue)" },
+  rejected: { label: "Rejected", badgeClass: "sc-badge-rejected", icon: <XCircle size={14} />, color: "var(--sc-red)" },
 };
 
 const tabs: { key: AppStatus | "all"; label: string }[] = [
-  { key: "all", label: "Toutes" },
-  { key: "pending", label: "En attente" },
-  { key: "review", label: "En révision" },
-  { key: "accepted", label: "Acceptées" },
-  { key: "validated", label: "Validées" },
-  { key: "rejected", label: "Refusées" },
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
+  { key: "review", label: "In Review" },
+  { key: "accepted", label: "Accepted" },
+  { key: "validated", label: "Validated" },
+  { key: "rejected", label: "Rejected" },
 ];
+
+/* ── build a timeline from real convention/application state ── */
+function buildTimeline(app: Application, conv: ConventionRow | undefined) {
+  return [
+    { label: "Application submitted", date: app.appliedDate, done: true },
+    {
+      label: "Under review",
+      date: "—",
+      done: app.status === "review" || app.status === "accepted" || app.status === "validated",
+    },
+    {
+      label: app.status === "rejected" ? "Not selected" : "Accepted",
+      date: "—",
+      done: app.status === "accepted" || app.status === "validated" || app.status === "rejected",
+    },
+    {
+      label: "Convention signed",
+      date: "—",
+      done: !!conv && conv.student_signed && conv.company_signed && conv.admin_validated,
+    },
+    {
+      label: "Internship validated",
+      date: "—",
+      done: app.status === "validated",
+    },
+  ];
+}
+
 /* ══════════════════════════════════════════════════════════
    REPORT SECTION
    ══════════════════════════════════════════════════════════ */
@@ -178,7 +167,7 @@ function ReportSection({
   appId: number;
   onRefresh: () => void;
 }) {
-  const [uploading, setUploading] = React.useState(false);
+  const [uploading, setUploading] = useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -201,7 +190,7 @@ function ReportSection({
   };
 
   return (
-    <div style={{ marginTop: 8, width: "100%" }}>
+    <>
       <input
         type="file"
         accept=".pdf,.doc,.docx"
@@ -210,19 +199,19 @@ function ReportSection({
         onChange={handleUpload}
       />
       <button
-        className="mi-action-btn mi-sign-btn"
+        className="sc-btn-primary off-apply-full"
         style={{ background: "#8b5cf6" }}
         onClick={() => fileRef.current?.click()}
         disabled={uploading}
       >
-        📄 {uploading ? "Envoi en cours…" : "Soumettre le rapport de stage"}
+        <FileText size={16} /> {uploading ? "Envoi en cours…" : "Soumettre le rapport de stage"}
       </button>
-    </div>
+    </>
   );
 }
 
 /* ══════════════════════════════════════════════════════════
-   CONVENTION SIGNING POPUP — same as MyInterns ConventionPopup
+   CONVENTION SIGNING POPUP
    ══════════════════════════════════════════════════════════ */
 function ConventionPopup({
   conventionId,
@@ -294,7 +283,6 @@ function ConventionPopup({
         ) : (
           <>
             <div className="conv-body">
-              {/* Summary */}
               <div className="conv-summary">
                 <div className="conv-summary-item">
                   <span>Stagiaire</span>
@@ -310,7 +298,6 @@ function ConventionPopup({
                 </div>
               </div>
 
-              {/* Explanation */}
               <div className="conv-explainer">
                 <div className="conv-explainer-icon">ℹ️</div>
                 <p>
@@ -321,7 +308,6 @@ function ConventionPopup({
                 </p>
               </div>
 
-              {/* Signature chain — student signs first */}
               <div className="conv-chain">
                 <div className="conv-chain-step conv-chain-current">
                   <span className="conv-chain-dot conv-chain-pulse" />
@@ -339,7 +325,6 @@ function ConventionPopup({
                 </div>
               </div>
 
-              {/* Checkbox */}
               <label className="conv-agree">
                 <input
                   type="checkbox"
@@ -380,215 +365,6 @@ function ConventionPopup({
 }
 
 /* ══════════════════════════════════════════════════════════
-   APPLICATION CARD — mirrors InternCard from MyInterns
-   ══════════════════════════════════════════════════════════ */
-function ApplicationCard({
-  app,
-  conv,
-  onSignConvention,
-  onDownload,
-  onPreview,
-  onRefresh,
-  onDownloadAttestation,
-}: {
-  app: Application;
-  conv: ConventionRow | undefined;
-  onSignConvention: (app: Application, conv: ConventionRow) => void;
-  onDownload: (convId: number) => void;
-  onPreview: (convId: number) => void;
-  onRefresh: () => void;
-  onDownloadAttestation: (appId: number) => void;
-}) {
-  const cfg = STATUS_CONFIG[app.status];
-  const initial = app.logo;
-
-  /* Convention status label */
-  const convLabel = () => {
-    if (!conv) return null;
-    if (!conv.student_signed)
-      return {
-        text: "✍️ En attente de votre signature",
-        color: "#f59e0b",
-        bg: "#fffbeb",
-      };
-    if (!conv.company_signed)
-      return {
-        text: "📄 En attente de la signature entreprise",
-        color: "#1e40af",
-        bg: "#eff6ff",
-      };
-    if (!conv.admin_validated)
-      return {
-        text: "🏛️ En attente de validation admin",
-        color: "#5b21b6",
-        bg: "#f5f3ff",
-      };
-    return { text: "✅ Convention validée", color: "#14532d", bg: "#f0fdf4" };
-  };
-  const cl = convLabel();
-
-  return (
-    <div
-      className="mi-card"
-      style={
-        {
-          "--stage-color": cfg.color,
-          "--stage-bg": cfg.bg,
-          "--stage-border": cfg.border,
-        } as React.CSSProperties
-      }
-    >
-      {/* Colored stripe */}
-      <div className="mi-card-stripe" />
-
-      <div className="mi-card-body">
-        {/* Student / company identity row */}
-        <div className="mi-student-row">
-          <div
-            className="mi-avatar"
-            style={{
-              background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}aa)`,
-            }}
-          >
-            {initial}
-          </div>
-          <div className="mi-student-info">
-            <strong>{app.title}</strong>
-            <span>{app.company}</span>
-          </div>
-          <div className="mi-stage-badge">
-            <span className="mi-stage-icon">{cfg.icon}</span>
-            <span>{cfg.label}</span>
-          </div>
-        </div>
-
-        {/* Location row */}
-        <div className="mi-offer-row">
-          <MapPin size={13} />
-          <span>{app.wilaya}</span>
-        </div>
-
-        {/* Applied date */}
-        <div className="mi-date-row">
-          <Calendar size={13} />
-          <span>Candidature déposée le {app.appliedDate}</span>
-        </div>
-
-        {/* Convention status badge */}
-        {cl && (
-          <div
-            style={{
-              fontSize: 12,
-              padding: "4px 10px",
-              borderRadius: 20,
-              background: cl.bg,
-              color: cl.color,
-              fontWeight: 600,
-              display: "inline-block",
-              marginTop: 4,
-            }}
-          >
-            {cl.text}
-          </div>
-        )}
-      </div>
-
-      {/* Footer action — mirrors InternCard exactly */}
-      <div className="mi-card-footer">
-        {/* ACCEPTED + convention needs student signature */}
-        {app.status === "accepted" && conv && !conv.student_signed && (
-          <button
-            className="mi-action-btn mi-sign-btn"
-            onClick={() => onSignConvention(app, conv)}
-          >
-            ✍️ Signer la convention
-          </button>
-        )}
-
-        {/* Waiting for company */}
-        {conv && conv.student_signed && !conv.company_signed && (
-          <div className="mi-waiting-msg">
-            <div className="mi-waiting-dot" />
-            En attente de la signature entreprise…
-          </div>
-        )}
-
-        {/* Waiting for admin */}
-        {conv && conv.company_signed && !conv.admin_validated && (
-          <div className="mi-waiting-msg">
-            <div className="mi-waiting-dot" />
-            En attente de la validation administration…
-          </div>
-        )}
-
-        {/* Accepted but no convention yet */}
-        {app.status === "accepted" && !conv && (
-          <div className="mi-waiting-msg">
-            <div className="mi-waiting-dot" />
-            Convention en cours de préparation…
-          </div>
-        )}
-
-        {/* Pending / review */}
-        {(app.status === "pending" || app.status === "review") && (
-          <div className="mi-waiting-msg">
-            <div className="mi-waiting-dot" />
-            {cfg.desc}
-          </div>
-        )}
-
-        {/* Rejected */}
-        {app.status === "rejected" && (
-          <div className="mi-done-msg" style={{ color: "#ef4444" }}>
-            ❌ Candidature non retenue
-          </div>
-        )}
-
-        {/* Validated + download */}
-        {/* Validated + download */}
-        {app.status === "validated" && conv?.admin_validated && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              width: "100%",
-            }}
-          >
-            <button
-              className="mi-action-btn mi-sign-btn"
-              style={{ background: "#3b82f6" }}
-              onClick={() => onPreview(conv!.id)}
-            >
-              <Eye size={14} /> Voir la convention
-            </button>
-            <button
-              className="mi-action-btn mi-sign-btn"
-              style={{ background: "#0f4c99" }}
-              onClick={() => onDownload(conv!.id)}
-            >
-              <Download size={14} /> Télécharger la convention
-            </button>
-
-            {app.attestation_issued ? (
-              <button
-                className="mi-action-btn mi-sign-btn"
-                style={{ background: "#22c55e" }}
-                onClick={() => onDownloadAttestation(app.id)}
-              >
-                🏅 Télécharger l'attestation de stage
-              </button>
-            ) : (
-              <ReportSection appId={app.id} onRefresh={onRefresh} />
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════
    MAIN PAGE
    ══════════════════════════════════════════════════════════ */
 const ApplicationsPage: React.FC = () => {
@@ -596,6 +372,7 @@ const ApplicationsPage: React.FC = () => {
   const [conventions, setConventions] = useState<ConventionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<AppStatus | "all">("all");
+  const [modal, setModal] = useState<Application | null>(null);
   const [signTarget, setSignTarget] = useState<{
     app: Application;
     conv: ConventionRow;
@@ -651,11 +428,13 @@ const ApplicationsPage: React.FC = () => {
     [applications],
   );
 
+  /* ── Actions (unchanged API logic) ── */
   const handleSigned = async () => {
     setSignTarget(null);
     await loadAll();
     toast.success("Convention signée !");
   };
+
   const handleDownloadConvention = async (convId: number) => {
     try {
       const response = await api.get(`conventions/${convId}/download/`, {
@@ -705,74 +484,50 @@ const ApplicationsPage: React.FC = () => {
     }
   };
 
+  /* convention for the application currently in the modal */
+  const modalConv = modal
+    ? conventions.find((c) => c.application_id === modal.id)
+    : undefined;
+
   return (
-    <DashboardLayout pageTitle="Mes Candidatures">
+    <DashboardLayout pageTitle="My Applications">
+
       {/* ── HERO ── */}
       <div className="page-hero applications-hero">
         <div className="hero-overlay" />
         <div className="hero-content">
-          <h1>Mes Candidatures</h1>
-          <p>Suivez vos candidatures et signez vos conventions de stage</p>
+          <h1>My Applications</h1>
+          <p>Track every application, monitor status updates, and download your conventions</p>
         </div>
       </div>
 
-      {/* ── STATS ROW — same as MyInterns mi-stats-row ── */}
-      <div className="mi-stats-row" style={{ marginBottom: 20 }}>
+      {/* ── STAT STRIP ── */}
+      <div className="app-stat-strip">
         {[
-          { label: "Total", val: counts.all, icon: "📋", color: "#3b82f6" },
-          {
-            label: "En attente",
-            val: counts.pending,
-            icon: "⏳",
-            color: "#f59e0b",
-          },
-          {
-            label: "En révision",
-            val: counts.review,
-            icon: "🔍",
-            color: "#8b5cf6",
-          },
-          {
-            label: "Acceptées",
-            val: counts.accepted,
-            icon: "✅",
-            color: "#22c55e",
-          },
-          {
-            label: "Validées",
-            val: counts.validated,
-            icon: "🏆",
-            color: "#3b82f6",
-          },
-          {
-            label: "Refusées",
-            val: counts.rejected,
-            icon: "❌",
-            color: "#ef4444",
-          },
+          { label: "Total", value: counts.all, color: "var(--sc-blue)" },
+          { label: "Pending", value: counts.pending, color: "var(--sc-warn)" },
+          { label: "In Review", value: counts.review, color: "var(--sc-purple)" },
+          { label: "Accepted", value: counts.accepted, color: "var(--sc-green)" },
+          { label: "Validated", value: counts.validated, color: "var(--sc-blue)" },
+          { label: "Rejected", value: counts.rejected, color: "var(--sc-red)" },
         ].map((s) => (
-          <div
-            key={s.label}
-            className="mi-stat"
-            style={{ "--stat-color": s.color } as React.CSSProperties}
-          >
-            <span className="mi-stat-icon">{s.icon}</span>
-            <strong className="mi-stat-val">{s.val}</strong>
-            <span className="mi-stat-label">{s.label}</span>
+          <div className="app-stat-item" key={s.label}>
+            <span className="app-stat-value" style={{ color: s.color }}>{s.value}</span>
+            <span className="app-stat-label">{s.label}</span>
           </div>
         ))}
       </div>
 
-      {/* ── TABS — same as MyInterns mi-tabs ── */}
-      <div className="mi-tabs" style={{ marginBottom: 20 }}>
+      {/* ── TABS ── */}
+      <div className="app-tabs">
         {tabs.map((t) => (
           <button
             key={t.key}
-            className={`mi-tab ${activeTab === t.key ? "mi-tab-active" : ""}`}
+            className={`app-tab ${activeTab === t.key ? "active" : ""}`}
             onClick={() => setActiveTab(t.key)}
           >
             {t.label}
-            <span className="mi-tab-count">{counts[t.key]}</span>
+            <span className="app-tab-count">{counts[t.key]}</span>
           </button>
         ))}
       </div>
@@ -785,45 +540,252 @@ const ApplicationsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── EMPTY ── */}
-      {!loading && filtered.length === 0 && (
-        <div className="mi-empty">
-          <span className="mi-empty-icon">
-            <Briefcase size={40} strokeWidth={1.5} />
-          </span>
-          <h3>Aucune candidature trouvée</h3>
-          <p>
-            {activeTab === "all"
-              ? "Vous n'avez pas encore postulé à des offres."
-              : "Aucune candidature dans cette catégorie."}
-          </p>
-        </div>
+      {/* ── LIST ── */}
+      {!loading && (
+        <AnimatePresence mode="popLayout">
+          {filtered.length === 0 ? (
+            <motion.div
+              className="mi-empty"
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <span className="mi-empty-icon">
+                <Briefcase size={40} strokeWidth={1.5} />
+              </span>
+              <h3>Aucune candidature trouvée</h3>
+              <p>
+                {activeTab === "all"
+                  ? "Vous n'avez pas encore postulé à des offres."
+                  : "Aucune candidature dans cette catégorie."}
+              </p>
+            </motion.div>
+          ) : (
+            <div className="app-list" key="list">
+              {filtered.map((app, i) => {
+                const cfg = statusConfig[app.status];
+                const conv = conventions.find((c) => c.application_id === app.id);
+                const canDownload =
+                  app.status === "validated" && conv?.admin_validated;
+
+                return (
+                  <motion.div
+                    key={app.id}
+                    className="app-row"
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.22, delay: i * 0.05 }}
+                  >
+                    {/* Status bar on left */}
+                    <div className="app-row-bar" style={{ background: cfg.color }} />
+
+                    {/* Logo */}
+                    <div className="sc-offer-logo app-logo">{app.logo}</div>
+
+                    {/* Info */}
+                    <div className="app-row-info">
+                      <div className="app-row-top">
+                        <h4>{app.title}</h4>
+                        <span className={`sc-badge ${cfg.badgeClass}`}>
+                          {cfg.icon} {cfg.label}
+                        </span>
+                      </div>
+                      <div className="app-row-meta">
+                        <span><Building2 size={12} />{app.company}</span>
+                        <span><MapPin size={12} />{app.wilaya}</span>
+                        <span><Calendar size={12} />Applied {app.appliedDate}</span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="app-row-actions">
+                      {/* sign convention */}
+                      {app.status === "accepted" && conv && !conv.student_signed && (
+                        <button
+                          className="sc-btn-download"
+                          onClick={() => setSignTarget({ app, conv })}
+                        >
+                          ✍️ Signer
+                        </button>
+                      )}
+                      {/* download convention */}
+                      {canDownload && (
+                        <button
+                          className="sc-btn-download"
+                          onClick={() => handleDownloadConvention(conv!.id)}
+                        >
+                          <Download size={13} /> Convention
+                        </button>
+                      )}
+                      <button
+                        className="app-view-btn"
+                        onClick={() => setModal(app)}
+                      >
+                        <Eye size={14} /> View <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </AnimatePresence>
       )}
 
-      {/* ── CARDS GRID — same mi-grid as MyInterns ── */}
-      {!loading && filtered.length > 0 && (
-        <div className="mi-grid">
-          {filtered.map((app, i) => {
-            const conv = conventions.find((c) => c.application_id === app.id);
-
-            return (
-              <div key={app.id} style={{ animationDelay: `${i * 60}ms` }}>
-                <ApplicationCard
-                  app={app}
-                  conv={conv}
-                  onSignConvention={(a, c) =>
-                    setSignTarget({ app: a, conv: c })
-                  }
-                  onDownload={handleDownloadConvention}
-                  onPreview={handlePreviewConvention}
-                  onRefresh={loadAll}
-                  onDownloadAttestation={handleDownloadAttestation}
-                />
+      {/* ── MODAL ── */}
+      <AnimatePresence>
+        {modal && (
+          <>
+            <motion.div
+              className="off-modal-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setModal(null)}
+            />
+            <motion.div
+              className="off-modal app-modal"
+              initial={{ opacity: 0, scale: 0.93, y: 40 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.93, y: 40 }}
+              transition={{ duration: 0.26, ease: "easeOut" }}
+            >
+              {/* Header */}
+              <div className="off-modal-header">
+                <div className="sc-offer-logo off-modal-logo">{modal.logo}</div>
+                <div className="off-modal-title">
+                  <h2>{modal.title}</h2>
+                  <span>{modal.company} · {modal.wilaya}</span>
+                </div>
+                <button className="off-modal-close" onClick={() => setModal(null)}>
+                  <X size={20} />
+                </button>
               </div>
-            );
-          })}
-        </div>
-      )}
+
+              {/* Badges */}
+              <div className="off-modal-badges">
+                <span className={`sc-badge ${statusConfig[modal.status].badgeClass}`}>
+                  {statusConfig[modal.status].icon} {statusConfig[modal.status].label}
+                </span>
+                <span className="off-mpill"><Calendar size={12} />Applied {modal.appliedDate}</span>
+              </div>
+
+              {/* Timeline (built from real status) */}
+              <div className="off-modal-section">
+                <h3>Application Timeline</h3>
+                <div className="app-timeline">
+                  {buildTimeline(modal, modalConv).map((ev, idx, arr) => (
+                    <div
+                      key={idx}
+                      className={`app-tl-step ${ev.done ? "done" : "todo"}`}
+                    >
+                      <div className="app-tl-dot">
+                        {ev.done
+                          ? <CheckCircle2 size={16} />
+                          : <div className="app-tl-empty-dot" />}
+                      </div>
+                      {idx < arr.length - 1 && (
+                        <div className={`app-tl-line ${ev.done ? "done" : ""}`} />
+                      )}
+                      <div className="app-tl-content">
+                        <span className="app-tl-label">{ev.label}</span>
+                        <span className="app-tl-date">{ev.date}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Details */}
+              <div className="off-modal-section">
+                <h3>Details</h3>
+                <div className="off-modal-details">
+                  <div className="off-mdetail">
+                    <span>Applied on</span>
+                    <strong>{modal.appliedDate}</strong>
+                  </div>
+                  <div className="off-mdetail">
+                    <span>Company</span>
+                    <strong>{modal.company}</strong>
+                  </div>
+                  <div className="off-mdetail">
+                    <span>Location</span>
+                    <strong>{modal.wilaya}</strong>
+                  </div>
+                  <div className="off-mdetail">
+                    <span>Status</span>
+                    <strong>{statusConfig[modal.status].label}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTA */}
+              <div className="off-modal-cta">
+                {/* sign convention */}
+                {modal.status === "accepted" && modalConv && !modalConv.student_signed && (
+                  <button
+                    className="sc-btn-primary off-apply-full"
+                    onClick={() => {
+                      setSignTarget({ app: modal, conv: modalConv });
+                      setModal(null);
+                    }}
+                  >
+                    ✍️ Signer la convention
+                  </button>
+                )}
+
+                {/* validated → preview / download / report / attestation */}
+                {modal.status === "validated" && modalConv?.admin_validated && (
+                  <>
+                    <button
+                      className="sc-btn-primary off-apply-full"
+                      style={{ background: "#3b82f6" }}
+                      onClick={() => handlePreviewConvention(modalConv.id)}
+                    >
+                      <Eye size={16} /> Voir la convention
+                    </button>
+                    <button
+                      className="sc-btn-primary off-apply-full"
+                      onClick={() => handleDownloadConvention(modalConv.id)}
+                    >
+                      <Download size={16} /> Télécharger la convention
+                    </button>
+                    {modal.attestation_issued ? (
+                      <button
+                        className="sc-btn-primary off-apply-full"
+                        style={{ background: "#22c55e" }}
+                        onClick={() => handleDownloadAttestation(modal.id)}
+                      >
+                        🏅 Télécharger l'attestation de stage
+                      </button>
+                    ) : (
+                      <ReportSection appId={modal.id} onRefresh={loadAll} />
+                    )}
+                  </>
+                )}
+
+                {/* not yet actionable */}
+                {!(modal.status === "accepted" && modalConv && !modalConv.student_signed) &&
+                  !(modal.status === "validated" && modalConv?.admin_validated) && (
+                    <div className="app-no-convention">
+                      <FileText size={16} />
+                      {modal.status === "accepted"
+                        ? "Convention is being prepared…"
+                        : modal.status === "rejected"
+                          ? "Application not selected"
+                          : "Convention available once accepted"}
+                    </div>
+                  )}
+
+                <button className="sc-btn-outline" onClick={() => setModal(null)}>
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── CONVENTION SIGNING POPUP ── */}
       {signTarget && (

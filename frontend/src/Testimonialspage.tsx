@@ -7,68 +7,68 @@ const TESTIMONIALS = [
         name: "Ryad Mahrez",
         university: "USTHB",
         company: "Yassir",
-        role: "Stagiaire Backend Engineering",
-        quote: "Stag.io a rendu ma recherche de stage incroyablement simple. J'ai postulé à 3 offres et j'avais des entretiens programmés en moins d'une semaine. Ce stage chez Yassir a complètement changé ma trajectoire professionnelle.",
+        role: "Backend Engineering Intern",
+        quote: "Stag.io made my internship search incredibly simple. I applied to 3 offers and had interviews scheduled in less than a week. This internship at Yassir completely changed my career path.",
         initials: "RM",
         color: "#1a1a2e",
     },
     {
         id: 2,
         name: "Sarah Benali",
-        university: "ESI Alger",
+        university: "ESI Algiers",
         company: "Ooredoo",
-        role: "Stagiaire Data Science",
-        quote: "J'avais du mal à trouver des opportunités pertinentes en Data Science. Le système de filtres m'a aidée à trouver exactement ce que je cherchais. L'interface est très bien pensée et facile à utiliser.",
+        role: "Data Science Intern",
+        quote: "I was struggling to find relevant opportunities in Data Science. The filter system helped me find exactly what I was looking for. The interface is very well designed and easy to use.",
         initials: "SB",
         color: "#5C1F2E",
     },
     {
         id: 3,
         name: "Karim Ziani",
-        university: "Université de Béjaïa",
+        university: "University of Bejaia",
         company: "Cevital",
-        role: "Stagiaire Support IT",
-        quote: "Ce que j'apprécie, c'est que les entreprises répondent vraiment. Stag.io vérifie les entreprises, donc je savais que les offres étaient sérieuses. J'ai fini par recevoir une offre en CDI après mon stage de 3 mois.",
+        role: "IT Support Intern",
+        quote: "What I appreciate is that companies actually respond. Stag.io verifies companies, so I knew the offers were genuine. I ended up receiving a permanent job offer after my 3-month internship.",
         initials: "KZ",
         color: "#2A4A2A",
     },
     {
         id: 4,
         name: "Lina Khelifi",
-        university: "Université Constantine 2",
+        university: "Constantine 2 University",
         company: "Sonatrach",
-        role: "Stagiaire Développement Logiciel",
-        quote: "La plateforme donne confiance. Elle ne ressemble pas à un portail gouvernemental ennuyeux. Je recommande vivement de compléter son profil — cela rend la candidature ultra-rapide.",
+        role: "Software Development Intern",
+        quote: "The platform inspires confidence. It doesn't feel like a boring government portal. I highly recommend completing your profile \u2014 it makes applying lightning fast.",
         initials: "LK",
         color: "#B8893E",
     },
     {
         id: 5,
         name: "Amine Toumi",
-        university: "Université de Sétif 1",
+        university: "Setif 1 University",
         company: "Mobilis",
-        role: "Stagiaire Réseaux",
-        quote: "J'ai trouvé un stage hybride, ce qui est rare en Algérie. Les filtres de Stag.io m'ont permis de chercher spécifiquement des postes distants/hybrides. Ça m'a économisé des heures de navigation sur LinkedIn.",
+        role: "Networks Intern",
+        quote: "I found a hybrid internship, which is rare in Algeria. Stag.io's filters let me search specifically for remote/hybrid positions. It saved me hours of browsing on LinkedIn.",
         initials: "AT",
         color: "#0f3460",
     },
     {
         id: 6,
         name: "Fatima Zahra",
-        university: "Université d'Oran",
+        university: "University of Oran",
         company: "Djezzy",
-        role: "Stagiaire UX Design",
-        quote: "En tant que designer, j'apprécie une bonne UX, et cette plateforme l'a. La fonction de suivi des candidatures m'a aidée à rester sereine pendant la période d'attente. Expérience 10/10.",
+        role: "UX Design Intern",
+        quote: "As a designer, I appreciate good UX, and this platform has it. The application tracking feature helped me stay calm during the waiting period. A 10/10 experience.",
         initials: "FZ",
         color: "#4E2A6A",
     },
 ];
 
 const STATS = [
-    { num: "2 400+", label: "Étudiants placés" },
-    { num: "94%", label: "Taux de satisfaction" },
-    { num: "180+", label: "Entreprises partenaires" },
-    { num: "48h", label: "Délai de réponse moyen" },
+    { num: "2,400+", label: "Students placed" },
+    { num: "94%", label: "Satisfaction rate" },
+    { num: "180+", label: "Partner companies" },
+    { num: "48h", label: "Average response time" },
 ];
 
 export default function TestimonialsPage() {
@@ -77,9 +77,9 @@ export default function TestimonialsPage() {
             <div className="page-dark-hero">
                 <div className="page-dark-hero-overlay" />
                 <div className="page-dark-hero-content">
-                    <span className="page-dark-hero-badge">Témoignages</span>
-                    <h1>Ils ont réussi grâce à Stag.io</h1>
-                    <p>Des étudiants comme vous ont trouvé leur stage idéal et transformé leur carrière. Voici leurs histoires.</p>
+                    <span className="page-dark-hero-badge">Testimonials</span>
+                    <h1>They succeeded thanks to Stag.io</h1>
+                    <p>Students like you have found their ideal internship and transformed their careers. Here are their stories.</p>
                 </div>
             </div>
 
@@ -118,13 +118,13 @@ export default function TestimonialsPage() {
                 </div>
 
                 <div className="testimonials-cta">
-                    <h2>Prêt à commencer votre aventure ?</h2>
+                    <h2>Ready to start your journey?</h2>
                     <div className="testimonials-cta-btns">
                         <Link to="/offers">
-                            <button className="ts-btn-primary">Découvrir les offres</button>
+                            <button className="ts-btn-primary">Browse offers</button>
                         </Link>
                         <Link to="/contact">
-                            <button className="ts-btn-outline">Nous contacter</button>
+                            <button className="ts-btn-outline">Contact us</button>
                         </Link>
                     </div>
                 </div>

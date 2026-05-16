@@ -28,11 +28,11 @@ type ApiRow = {
 };
 
 const STAGE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  convention_to_sign:   { label: "Convention à signer",     color: "#3b82f6", bg: "#eff6ff" },
-  internship_in_progress: { label: "Stage en cours",        color: "#22c55e", bg: "#f0fdf4" },
-  report_to_validate:   { label: "Rapport soumis",          color: "#f59e0b", bg: "#fffbeb" },
-  report_validated:     { label: "Rapport validé ✓",        color: "#8b5cf6", bg: "#f5f3ff" },
-  completed:            { label: "Terminé",                  color: "#64748b", bg: "#f8fafc" },
+  convention_to_sign: { label: "Convention à signer", color: "#3b82f6", bg: "#eff6ff" },
+  internship_in_progress: { label: "Stage en cours", color: "#22c55e", bg: "#f0fdf4" },
+  report_to_validate: { label: "Rapport soumis", color: "#f59e0b", bg: "#fffbeb" },
+  report_validated: { label: "Rapport validé ✓", color: "#8b5cf6", bg: "#f5f3ff" },
+  completed: { label: "Terminé", color: "#64748b", bg: "#f8fafc" },
 };
 
 export default function ADMReports() {

@@ -78,6 +78,11 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    if (originalRequest.url?.includes('auth/login') ||
+      originalRequest.url?.includes('auth/register')) {
+      return Promise.reject(error);
+    }
+
     if (originalRequest._retry) {
       clearStoredAuth();
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {

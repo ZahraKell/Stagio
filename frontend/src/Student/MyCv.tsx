@@ -1,9 +1,13 @@
+// MyCv.tsx — full Euro CV builder with all fields + backend API
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  User,
   GraduationCap,
   Briefcase,
   Code2,
   Globe,
+  Heart,
+  Users,
   Plus,
   Trash2,
   ChevronDown,
@@ -12,114 +16,165 @@ import {
   Edit3,
   Download,
   Check,
+  RotateCcw,
   RefreshCw,
-  Link as LinkIcon,
 } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
 import api from "../api";
 import toast from "react-hot-toast";
 
-type SkillLevel = "beginner" | "intermediate" | "advanced" | "expert";
-type LangLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "native";
+/* ================================================================
+   TYPES
+   ================================================================ */
 
-interface CvEducation {
-  id: number;
+type SkillLevel = "beginner" | "intermediate" | "advanced" | "expert";
+type LangLevel =
+  | "native"
+  | "A1 — Beginner"
+  | "A2 — Elementary"
+  | "B1 — Intermediate"
+  | "B2 — Upper-Intermediate"
+  | "C1 — Advanced"
+  | "C2 — Proficient";
+
+interface LocalSkill {
+  id: string;
+  name: string;
+  level: number; // 1–6 dots
+  serverId?: number;
+}
+
+interface LocalLanguage {
+  id: string;
+  name: string;
+  level: LangLevel;
+  serverId?: number;
+}
+
+interface LocalHobby {
+  id: string;
+  value: string;
+}
+
+interface LocalEducation {
+  id: string;
+  serverId?: number;
   degree: string;
   institution: string;
   field: string;
-  start_year: number;
-  end_year: number | null;
-  is_current: boolean;
+  startDate: string;
+  endDate: string;
+  isCurrent: boolean;
   description: string;
 }
 
-interface CvExperience {
-  id: number;
-  job_title: string;
+interface LocalExperience {
+  id: string;
+  serverId?: number;
+  title: string;
   company: string;
   location: string;
-  start_date: string;
-  end_date: string | null;
-  is_current: boolean;
+  startDate: string;
+  endDate: string;
+  isCurrent: boolean;
   description: string;
 }
 
-interface CvSkill {
-  id: number;
+interface LocalReference {
+  id: string;
   name: string;
-  level: SkillLevel;
+  position: string;
+  email: string;
+  phone: string;
 }
 
-interface CvLanguage {
-  id: number;
-  name: string;
-  level: LangLevel;
-}
-
-interface CvData {
-  id: number;
-  github: string;
+interface PersonalInfo {
+  firstName: string;
+  lastName: string;
+  dob: string;
+  nationality: string;
+  email: string;
+  phone: string;
+  address: string;
   linkedin: string;
+  github: string;
   portfolio: string;
-  description: string;
-  update_date: string;
-  educations: CvEducation[];
-  experiences: CvExperience[];
-  skills: CvSkill[];
-  languages: CvLanguage[];
+  summary: string;
 }
 
-interface ProfileStudent {
-  student_number?: string;
-  institution?: string;
-  grade?: string;
-  speciality?: string;
-  field?: string;
+/* ── Backend shapes ── */
+interface CvEducation {
+  id: number; degree: string; institution: string; field: string;
+  start_year: number; end_year: number | null; is_current: boolean; description: string;
 }
+interface CvExperience {
+  id: number; job_title: string; company: string; location: string;
+  start_date: string; end_date: string | null; is_current: boolean; description: string;
+}
+interface CvSkill { id: number; name: string; level: SkillLevel; }
+interface CvLanguage { id: number; name: string; level: string; }
+interface CvData {
+  github: string; linkedin: string; portfolio: string; description: string;
+  educations: CvEducation[]; experiences: CvExperience[];
+  skills: CvSkill[]; languages: CvLanguage[];
+}
+interface ProfilePayload { full_name?: string; email?: string; town?: string; pnum?: string; }
+interface ScorePayload { score: number; label: string; tips: string[]; }
 
-interface ProfilePayload {
-  full_name?: string;
-  email?: string;
-  town?: string;
-  pnum?: string;
-  student?: ProfileStudent | null;
-}
+/* ================================================================
+   CONSTANTS
+   ================================================================ */
 
-interface ScorePayload {
-  score: number;
-  label: string;
-  completed: string[];
-  tips: string[];
-}
+const SKILL_LEVEL_LABELS = [
+  "Beginner", "Elementary", "Intermediate", "Upper-Inter.", "Advanced", "Expert",
+];
+
+const LANG_LEVELS: LangLevel[] = [
+  "native", "A1 — Beginner", "A2 — Elementary",
+  "B1 — Intermediate", "B2 — Upper-Intermediate",
+  "C1 — Advanced", "C2 — Proficient",
+];
+
+const SKILL_LEVEL_MAP: Record<SkillLevel, number> = {
+  beginner: 1, intermediate: 3, advanced: 5, expert: 6,
+};
+
+const dotsToServer = (dots: number): SkillLevel => {
+  if (dots <= 1) return "beginner";
+  if (dots <= 3) return "intermediate";
+  if (dots <= 5) return "advanced";
+  return "expert";
+};
+
+const DEFAULT_PERSONAL: PersonalInfo = {
+  firstName: "", lastName: "", dob: "", nationality: "",
+  email: "", phone: "", address: "", linkedin: "",
+  github: "", portfolio: "", summary: "",
+};
+
+/* ================================================================
+   UTILITY
+   ================================================================ */
+
+const uid = () => Math.random().toString(36).slice(2, 9);
 
 function unwrapData<T>(res: { data: unknown }): T | null {
-  const body = res.data as { data?: T; error?: boolean };
-  if (body && typeof body === "object" && "data" in body) {
-    return (body.data ?? null) as T | null;
-  }
+  const body = res.data as { data?: T };
+  if (body && typeof body === "object" && "data" in body) return (body.data ?? null) as T | null;
   return null;
 }
 
-/* ── Collapsible section ── */
-function SectionWrap({
-  icon,
-  title,
-  children,
-  defaultOpen = true,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
+/* ================================================================
+   SUB-COMPONENTS
+   ================================================================ */
+
+const SectionWrap: React.FC<{
+  icon: React.ReactNode; title: string; children: React.ReactNode; defaultOpen?: boolean;
+}> = ({ icon, title, children, defaultOpen = true }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="sc-cv-section-wrap">
-      <button
-        type="button"
-        className="sc-cv-section-toggle"
-        onClick={() => setOpen((o) => !o)}
-      >
+      <button type="button" className="sc-cv-section-toggle" onClick={() => setOpen((o) => !o)}>
         <div className="sc-cv-section-toggle-left">
           <div className="sc-cv-sec-icon">{icon}</div>
           {title}
@@ -129,55 +184,47 @@ function SectionWrap({
       {open && <div className="sc-cv-section-body">{children}</div>}
     </div>
   );
-}
+};
 
-function CompletionBar({ pct }: { pct: number }) {
-  return (
-    <div className="sc-cv-completion">
-      <span>{pct}%</span>
-      <div className="sc-cv-comp-bar">
-        <div className="sc-cv-comp-fill" style={{ width: `${pct}%` }} />
-      </div>
-      <span>Complete (server)</span>
+const SkillDots: React.FC<{ level: number; onChange: (l: number) => void }> = ({ level, onChange }) => (
+  <div className="sc-skill-dots">
+    {[1, 2, 3, 4, 5, 6].map((d) => (
+      <button
+        key={d} type="button"
+        className={`sc-skill-dot${d <= level ? " filled" : ""}`}
+        onClick={() => onChange(d)}
+        title={SKILL_LEVEL_LABELS[d - 1]}
+      />
+    ))}
+    <span className="sc-skill-level-label">{SKILL_LEVEL_LABELS[level - 1]}</span>
+  </div>
+);
+
+const CompletionBar: React.FC<{ pct: number }> = ({ pct }) => (
+  <div className="sc-cv-completion">
+    <span>{pct}%</span>
+    <div className="sc-cv-comp-bar">
+      <div className="sc-cv-comp-fill" style={{ width: `${pct}%` }} />
     </div>
-  );
-}
+    <span>Complete</span>
+  </div>
+);
 
-/* ── A4 preview ── */
-function EuroCvPreview({
-  fullName,
-  email,
-  phone,
-  town,
-  summary,
-  github,
-  linkedin,
-  portfolio,
-  educations,
-  experiences,
-  skills,
-  languages,
-}: {
-  fullName: string;
-  email: string;
-  phone: string;
-  town: string;
-  summary: string;
-  github: string;
-  linkedin: string;
-  portfolio: string;
-  educations: CvEducation[];
-  experiences: CvExperience[];
-  skills: CvSkill[];
-  languages: CvLanguage[];
-}) {
-  const initials = fullName
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+/* ================================================================
+   EURO CV PREVIEW (A4)
+   ================================================================ */
+
+const EuroCv: React.FC<{
+  personal: PersonalInfo;
+  education: LocalEducation[];
+  experience: LocalExperience[];
+  skills: LocalSkill[];
+  languages: LocalLanguage[];
+  hobbies: LocalHobby[];
+  references: LocalReference[];
+}> = ({ personal, education, experience, skills, languages, hobbies, references }) => {
+  const initials = (personal.firstName?.[0] ?? "") + (personal.lastName?.[0] ?? "");
+  const fullName = `${personal.firstName} ${personal.lastName}`.trim();
 
   return (
     <div className="euro-cv">
@@ -186,14 +233,19 @@ function EuroCvPreview({
           <div className="euro-cv-photo-placeholder">{initials || "?"}</div>
         </div>
         <div className="euro-cv-header-info">
-          <div className="euro-cv-name">{fullName || "Your name"}</div>
+          <div className="euro-cv-name">{fullName || "Your Name"}</div>
           <div className="euro-cv-contacts">
-            {email && <span>✉ {email}</span>}
-            {phone && <span>✆ {phone}</span>}
-            {town && <span>📍 {town}</span>}
-            {github && <span>🔗 GitHub: {github}</span>}
-            {linkedin && <span>🔗 LinkedIn: {linkedin}</span>}
-            {portfolio && <span>🔗 Portfolio: {portfolio}</span>}
+            {personal.email && <span>✉ {personal.email}</span>}
+            {personal.phone && <span>✆ {personal.phone}</span>}
+            {personal.address && <span>📍 {personal.address}</span>}
+            {personal.linkedin && <span>🔗 {personal.linkedin}</span>}
+            {personal.github && <span>🔗 {personal.github}</span>}
+            {personal.portfolio && <span>🌐 {personal.portfolio}</span>}
+          </div>
+          <div className="euro-cv-meta">
+            {personal.dob && `Date of Birth: ${personal.dob}`}
+            {personal.dob && personal.nationality && " · "}
+            {personal.nationality && `Nationality: ${personal.nationality}`}
           </div>
         </div>
       </div>
@@ -202,11 +254,13 @@ function EuroCvPreview({
         <div className="euro-cv-left">
           {skills.length > 0 && (
             <div className="euro-cv-block">
-              <div className="euro-cv-block-title">Skills</div>
+              <div className="euro-cv-block-title">Technical Skills</div>
               {skills.map((sk) => (
-                <div key={sk.id} className="euro-cv-lang-row">
-                  <span className="euro-cv-lang-name">{sk.name}</span>
-                  <span className="euro-cv-lang-level">{sk.level}</span>
+                <div key={sk.id} className="euro-cv-skill-row">
+                  <div className="euro-cv-skill-name">{sk.name}</div>
+                  <div className="euro-cv-skill-bar">
+                    <div className="euro-cv-skill-fill" style={{ width: `${Math.round((sk.level / 6) * 100)}%` }} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -222,977 +276,700 @@ function EuroCvPreview({
               ))}
             </div>
           )}
-        </div>
-        <div className="euro-cv-right">
-          {summary && (
+          {hobbies.length > 0 && (
             <div className="euro-cv-block">
-              <div className="euro-cv-block-title">Summary</div>
-              <div className="euro-cv-summary">{summary}</div>
+              <div className="euro-cv-block-title">Interests</div>
+              <div className="euro-cv-hobbies">
+                {hobbies.map((h) => (
+                  <span key={h.id} className="euro-cv-hobby-tag">{h.value}</span>
+                ))}
+              </div>
             </div>
           )}
-          {educations.length > 0 && (
+        </div>
+
+        <div className="euro-cv-right">
+          {personal.summary && (
+            <div className="euro-cv-block">
+              <div className="euro-cv-block-title">Professional Summary</div>
+              <div className="euro-cv-summary">{personal.summary}</div>
+            </div>
+          )}
+          {education.length > 0 && (
             <div className="euro-cv-block">
               <div className="euro-cv-block-title">Education</div>
-              {educations.map((e) => (
+              {education.map((e) => (
                 <div key={e.id} className="euro-cv-entry">
                   <div className="euro-cv-entry-header">
                     <div>
                       <div className="euro-cv-entry-title">{e.degree}</div>
                       <div className="euro-cv-entry-sub">{e.institution}</div>
                     </div>
-                    <span className="euro-cv-entry-date">
-                      {e.start_year}
-                      {e.is_current
-                        ? " – Present"
-                        : e.end_year
-                          ? ` – ${e.end_year}`
-                          : ""}
-                    </span>
+                    {(e.startDate || e.endDate) && (
+                      <span className="euro-cv-entry-date">
+                        {e.startDate}{e.startDate && (e.endDate || e.isCurrent) ? " – " : ""}
+                        {e.isCurrent ? "Present" : e.endDate}
+                      </span>
+                    )}
                   </div>
-                  {e.description && (
-                    <div className="euro-cv-entry-desc">{e.description}</div>
-                  )}
+                  {e.description && <div className="euro-cv-entry-desc">{e.description}</div>}
                 </div>
               ))}
             </div>
           )}
-          {experiences.length > 0 && (
+          {experience.length > 0 && (
             <div className="euro-cv-block">
-              <div className="euro-cv-block-title">Experience</div>
-              {experiences.map((x) => (
-                <div key={x.id} className="euro-cv-entry">
+              <div className="euro-cv-block-title">Work Experience</div>
+              {experience.map((e) => (
+                <div key={e.id} className="euro-cv-entry">
                   <div className="euro-cv-entry-header">
                     <div>
-                      <div className="euro-cv-entry-title">{x.job_title}</div>
-                      <div className="euro-cv-entry-sub">{x.company}</div>
+                      <div className="euro-cv-entry-title">{e.title}</div>
+                      <div className="euro-cv-entry-sub">{e.company}</div>
                     </div>
-                    <span className="euro-cv-entry-date">
-                      {x.start_date}
-                      {x.is_current
-                        ? " – Present"
-                        : x.end_date
-                          ? ` – ${x.end_date}`
-                          : ""}
-                    </span>
+                    {(e.startDate || e.endDate) && (
+                      <span className="euro-cv-entry-date">
+                        {e.startDate}{e.startDate && (e.endDate || e.isCurrent) ? " – " : ""}
+                        {e.isCurrent ? "Present" : e.endDate}
+                      </span>
+                    )}
                   </div>
-                  {x.description && (
-                    <div className="euro-cv-entry-desc">{x.description}</div>
-                  )}
+                  {e.description && <div className="euro-cv-entry-desc">{e.description}</div>}
                 </div>
               ))}
+            </div>
+          )}
+          {references.length > 0 && (
+            <div className="euro-cv-block">
+              <div className="euro-cv-block-title">References</div>
+              <div className="euro-cv-refs-grid">
+                {references.map((r) => (
+                  <div key={r.id}>
+                    <div className="euro-cv-ref-name">{r.name}</div>
+                    <div className="euro-cv-ref-pos">{r.position}</div>
+                    <div className="euro-cv-ref-contact">{r.email}</div>
+                    {r.phone && <div className="euro-cv-ref-contact">{r.phone}</div>}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
       </div>
     </div>
   );
-}
+};
 
-let tempId = -1;
-const nextTemp = () => tempId--;
+/* ================================================================
+   MAIN PAGE COMPONENT
+   ================================================================ */
 
-export default function MyCv() {
+const MyCv: React.FC = () => {
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<ProfilePayload | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [score, setScore] = useState<ScorePayload | null>(null);
 
-  const [github, setGithub] = useState("");
-  const [linkedin, setLinkedin] = useState("");
-  const [portfolio, setPortfolio] = useState("");
-  const [description, setDescription] = useState("");
+  const [personal, setPersonal] = useState<PersonalInfo>(DEFAULT_PERSONAL);
+  const [education, setEducation] = useState<LocalEducation[]>([]);
+  const [experience, setExperience] = useState<LocalExperience[]>([]);
+  const [skills, setSkills] = useState<LocalSkill[]>([]);
+  const [languages, setLanguages] = useState<LocalLanguage[]>([]);
+  const [hobbies, setHobbies] = useState<LocalHobby[]>([]);
+  const [references, setReferences] = useState<LocalReference[]>([]);
 
-  const [educations, setEducations] = useState<CvEducation[]>([]);
-  const [experiences, setExperiences] = useState<CvExperience[]>([]);
-  const [skills, setSkills] = useState<CvSkill[]>([]);
-  const [languages, setLanguages] = useState<CvLanguage[]>([]);
+  const updatePersonal = (field: keyof PersonalInfo, value: string) =>
+    setPersonal((p) => ({ ...p, [field]: value }));
 
-  const [saving, setSaving] = useState(false);
-
-  const applyCv = useCallback((cv: CvData | null) => {
-    if (!cv) {
-      setGithub("");
-      setLinkedin("");
-      setPortfolio("");
-      setDescription("");
-      setEducations([]);
-      setExperiences([]);
-      setSkills([]);
-      setLanguages([]);
-      return;
-    }
-    setGithub(cv.github || "");
-    setLinkedin(cv.linkedin || "");
-    setPortfolio(cv.portfolio || "");
-    setDescription(cv.description || "");
-    setEducations(cv.educations || []);
-    setExperiences(cv.experiences || []);
-    setSkills(cv.skills || []);
-    setLanguages(cv.languages || []);
-  }, []);
-
+  /* ── Load from backend ───────────────────────────────────── */
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
       const pRes = await api.get("auth/profile/");
-      setProfile(unwrapData<ProfilePayload>(pRes));
-    } catch (e) {
-      toast.error("Could not load profile.");
-      console.error("Profile load error:", e);
-    }
+      const profile = unwrapData<ProfilePayload>(pRes);
+      if (profile) {
+        const parts = (profile.full_name || "").split(" ");
+        setPersonal((prev) => ({
+          ...prev,
+          firstName: parts[0] || "",
+          lastName: parts.slice(1).join(" ") || "",
+          email: profile.email || prev.email,
+          phone: profile.pnum || prev.phone,
+          address: profile.town || prev.address,
+        }));
+      }
+    } catch { toast.error("Could not load profile."); }
+
     try {
       const cRes = await api.get("auth/cv/");
       const cv = unwrapData<CvData | null>(cRes);
-      applyCv(cv);
-    } catch {
-      // CV might not exist yet — that's OK
-    }
+      if (cv) {
+        setPersonal((prev) => ({
+          ...prev,
+          linkedin: cv.linkedin || prev.linkedin,
+          github: cv.github || prev.github,
+          portfolio: cv.portfolio || prev.portfolio,
+          summary: cv.description || prev.summary,
+        }));
+        setEducation((cv.educations || []).map((e) => ({
+          id: uid(), serverId: e.id,
+          degree: e.degree, institution: e.institution, field: e.field,
+          startDate: String(e.start_year), endDate: e.end_year ? String(e.end_year) : "",
+          isCurrent: e.is_current, description: e.description,
+        })));
+        setExperience((cv.experiences || []).map((x) => ({
+          id: uid(), serverId: x.id,
+          title: x.job_title, company: x.company, location: x.location,
+          startDate: x.start_date, endDate: x.end_date || "",
+          isCurrent: x.is_current, description: x.description,
+        })));
+        setSkills((cv.skills || []).map((s) => ({
+          id: uid(), serverId: s.id, name: s.name,
+          level: SKILL_LEVEL_MAP[s.level] ?? 3,
+        })));
+        setLanguages((cv.languages || []).map((l) => ({
+          id: uid(), serverId: l.id, name: l.name,
+          level: (l.level as LangLevel) || "B1 — Intermediate",
+        })));
+      }
+    } catch { /* CV might not exist yet */ }
+
     try {
       const sRes = await api.get("auth/cv/score/");
       setScore(unwrapData<ScorePayload>(sRes));
-    } catch {
-      // Score endpoint failed — not critical
-    }
+    } catch { /* not critical */ }
+
     setLoading(false);
-  }, [applyCv]);
+  }, []);
 
-  useEffect(() => {
-    void refreshAll();
-  }, [refreshAll]);
+  useEffect(() => { void refreshAll(); }, [refreshAll]);
 
-  const fullName = profile?.full_name || "";
-  const email = profile?.email || "";
-  const phone = profile?.pnum || "";
-  const town = profile?.town || "";
+  /* ── Completion ──────────────────────────────────────────── */
+  const completion = (): number => {
+    let filled = 0;
+    const total = 7;
+    if (personal.firstName && personal.lastName && personal.email && personal.phone) filled++;
+    if (personal.summary.length > 20) filled++;
+    if (education.length > 0 && education[0].degree) filled++;
+    if (experience.length > 0 && experience[0].title) filled++;
+    if (skills.length >= 3) filled++;
+    if (languages.length >= 1) filled++;
+    if (hobbies.length >= 2) filled++;
+    return Math.round((filled / total) * 100);
+  };
 
-  const saveGeneral = async () => {
+  const pct = score?.score ?? completion();
+
+  /* ── Save CV ─────────────────────────────────────────────── */
+  const handleSave = async () => {
     setSaving(true);
     try {
       await api.patch("auth/cv/update/", {
-        github,
-        linkedin,
-        portfolio,
-        description,
+        github: personal.github, linkedin: personal.linkedin,
+        portfolio: personal.portfolio, description: personal.summary,
       });
-      toast.success("CV summary saved.");
+
+      for (const e of education) {
+        const payload = {
+          degree: e.degree, institution: e.institution, field: e.field,
+          start_year: Number(e.startDate) || new Date().getFullYear(),
+          end_year: e.isCurrent ? null : (Number(e.endDate) || null),
+          is_current: e.isCurrent, description: e.description,
+        };
+        if (e.serverId) await api.patch(`auth/cv/education/${e.serverId}/`, payload);
+        else if (e.degree.trim() && e.institution.trim()) await api.post("auth/cv/education/", payload);
+      }
+
+      for (const x of experience) {
+        const payload = {
+          job_title: x.title, company: x.company, location: x.location,
+          start_date: x.startDate, end_date: x.isCurrent ? null : (x.endDate || null),
+          is_current: x.isCurrent, description: x.description,
+        };
+        if (x.serverId) await api.patch(`auth/cv/experience/${x.serverId}/`, payload);
+        else if (x.title.trim() && x.company.trim() && x.startDate.trim()) await api.post("auth/cv/experience/", payload);
+      }
+
+      for (const s of skills) {
+        const payload = { name: s.name, level: dotsToServer(s.level) };
+        if (s.serverId) await api.patch(`auth/cv/skill/${s.serverId}/`, payload);
+        else if (s.name.trim()) await api.post("auth/cv/skill/", payload);
+      }
+
+      for (const l of languages) {
+        const payload = { name: l.name, level: l.level };
+        if (l.serverId) await api.patch(`auth/cv/language/${l.serverId}/`, payload);
+        else if (l.name.trim()) await api.post("auth/cv/language/", payload);
+      }
+
+      toast.success("CV saved!");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
       await refreshAll();
     } catch {
-      toast.error("Save failed.");
+      toast.error("Save failed. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
-  const addEducationLocal = () => {
-    setEducations((list) => [
-      ...list,
-      {
-        id: nextTemp(),
-        degree: "",
-        institution: "",
-        field: "",
-        start_year: new Date().getFullYear(),
-        end_year: null,
-        is_current: false,
-        description: "",
-      },
-    ]);
+  const resetToProfile = () => void refreshAll();
+
+  const handleExportPdf = () => {
+    setTab("preview");
+    setTimeout(() => window.print(), 300);
   };
 
-  const persistEducation = async (e: CvEducation) => {
-    if (!e.degree.trim() || !e.institution.trim()) {
-      toast.error("Degree and institution are required.");
-      return;
+  /* ── Education ───────────────────────────────────────────── */
+  const addEducation = () =>
+    setEducation((l) => [...l, { id: uid(), degree: "", institution: "", field: "", startDate: "", endDate: "", isCurrent: false, description: "" }]);
+
+  const removeEducation = async (e: LocalEducation) => {
+    if (e.serverId) {
+      try { await api.delete(`auth/cv/education/${e.serverId}/delete/`); }
+      catch { toast.error("Delete failed."); return; }
     }
-    try {
-      if (e.id < 0) {
-        const res = await api.post("auth/cv/education/", {
-          degree: e.degree,
-          institution: e.institution,
-          field: e.field,
-          start_year: e.start_year,
-          end_year: e.is_current ? null : e.end_year,
-          is_current: e.is_current,
-          description: e.description,
-        });
-        const newId = (res.data as { data?: { id?: number } })?.data?.id;
-        if (newId) {
-          setEducations((list) =>
-            list.map((x) => (x.id === e.id ? { ...x, id: newId } : x)),
-          );
-        }
-        toast.success("Education added.");
-      } else {
-        await api.patch(`auth/cv/education/${e.id}/`, {
-          degree: e.degree,
-          institution: e.institution,
-          field: e.field,
-          start_year: e.start_year,
-          end_year: e.end_year,
-          is_current: e.is_current,
-          description: e.description,
-        });
-        toast.success("Education updated.");
-      }
-      await refreshAll();
-    } catch {
-      toast.error("Could not save education.");
-    }
+    setEducation((l) => l.filter((x) => x.id !== e.id));
   };
 
-  const removeEducation = async (e: CvEducation) => {
-    if (e.id < 0) {
-      setEducations((list) => list.filter((x) => x.id !== e.id));
-      return;
+  const updateEducation = (id: string, field: keyof LocalEducation, value: string | boolean) =>
+    setEducation((l) => l.map((e) => e.id === id ? { ...e, [field]: value } : e));
+
+  /* ── Experience ──────────────────────────────────────────── */
+  const addExperience = () =>
+    setExperience((l) => [...l, { id: uid(), title: "", company: "", location: "", startDate: "", endDate: "", isCurrent: false, description: "" }]);
+
+  const removeExperience = async (x: LocalExperience) => {
+    if (x.serverId) {
+      try { await api.delete(`auth/cv/experience/${x.serverId}/delete/`); }
+      catch { toast.error("Delete failed."); return; }
     }
-    try {
-      await api.delete(`auth/cv/education/${e.id}/delete/`);
-      toast.success("Removed.");
-      await refreshAll();
-    } catch {
-      toast.error("Delete failed.");
-    }
+    setExperience((l) => l.filter((r) => r.id !== x.id));
   };
 
-  const addExperienceLocal = () => {
-    setExperiences((list) => [
-      ...list,
-      {
-        id: nextTemp(),
-        job_title: "",
-        company: "",
-        location: "",
-        start_date: "",
-        end_date: null,
-        is_current: false,
-        description: "",
-      },
-    ]);
+  const updateExperience = (id: string, field: keyof LocalExperience, value: string | boolean) =>
+    setExperience((l) => l.map((e) => e.id === id ? { ...e, [field]: value } : e));
+
+  /* ── Skills ──────────────────────────────────────────────── */
+  const addSkill = () =>
+    setSkills((l) => [...l, { id: uid(), name: "", level: 3 }]);
+
+  const removeSkill = async (s: LocalSkill) => {
+    if (s.serverId) {
+      try { await api.delete(`auth/cv/skill/${s.serverId}/delete/`); }
+      catch { toast.error("Delete failed."); return; }
+    }
+    setSkills((l) => l.filter((x) => x.id !== s.id));
   };
 
-  const persistExperience = async (x: CvExperience) => {
-    if (!x.job_title.trim() || !x.company.trim() || !x.start_date.trim()) {
-      toast.error("Job title, company, and start date are required.");
-      return;
+  const updateSkill = (id: string, field: keyof LocalSkill, value: string | number) =>
+    setSkills((l) => l.map((s) => s.id === id ? { ...s, [field]: value } : s));
+
+  /* ── Languages ───────────────────────────────────────────── */
+  const addLanguage = () =>
+    setLanguages((l) => [...l, { id: uid(), name: "", level: "B1 — Intermediate" }]);
+
+  const removeLanguage = async (lang: LocalLanguage) => {
+    if (lang.serverId) {
+      try { await api.delete(`auth/cv/language/${lang.serverId}/delete/`); }
+      catch { toast.error("Delete failed."); return; }
     }
-    try {
-      if (x.id < 0) {
-        const res = await api.post("auth/cv/experience/", {
-          job_title: x.job_title,
-          company: x.company,
-          location: x.location,
-          start_date: x.start_date,
-          end_date: x.is_current ? null : x.end_date,
-          is_current: x.is_current,
-          description: x.description,
-        });
-        const newId = (res.data as { data?: { id?: number } })?.data?.id;
-        if (newId) {
-          setExperiences((list) =>
-            list.map((r) => (r.id === x.id ? { ...r, id: newId } : r)),
-          );
-        }
-        toast.success("Experience added.");
-      } else {
-        await api.patch(`auth/cv/experience/${x.id}/`, {
-          job_title: x.job_title,
-          company: x.company,
-          location: x.location,
-          start_date: x.start_date,
-          end_date: x.end_date,
-          is_current: x.is_current,
-          description: x.description,
-        });
-        toast.success("Experience updated.");
-      }
-      await refreshAll();
-    } catch {
-      toast.error("Could not save experience.");
-    }
+    setLanguages((l) => l.filter((x) => x.id !== lang.id));
   };
 
-  const removeExperience = async (x: CvExperience) => {
-    if (x.id < 0) {
-      setExperiences((list) => list.filter((r) => r.id !== x.id));
-      return;
-    }
-    try {
-      await api.delete(`auth/cv/experience/${x.id}/delete/`);
-      toast.success("Removed.");
-      await refreshAll();
-    } catch {
-      toast.error("Delete failed.");
-    }
-  };
+  const updateLanguage = (id: string, field: keyof LocalLanguage, value: string) =>
+    setLanguages((l) => l.map((x) => x.id === id ? { ...x, [field]: value } : x));
 
-  const addSkillLocal = () => {
-    setSkills((list) => [
-      ...list,
-      { id: nextTemp(), name: "", level: "intermediate" },
-    ]);
-  };
+  /* ── Hobbies ─────────────────────────────────────────────── */
+  const addHobby = () => setHobbies((l) => [...l, { id: uid(), value: "" }]);
+  const removeHobby = (id: string) => setHobbies((l) => l.filter((h) => h.id !== id));
+  const updateHobby = (id: string, value: string) =>
+    setHobbies((l) => l.map((h) => h.id === id ? { ...h, value } : h));
 
-  const persistSkill = async (s: CvSkill) => {
-    if (!s.name.trim()) {
-      toast.error("Skill name is required.");
-      return;
-    }
-    try {
-      if (s.id < 0) {
-        await api.post("auth/cv/skill/", { name: s.name, level: s.level });
-        toast.success("Skill added.");
-      } else {
-        await api.patch(`auth/cv/skill/${s.id}/`, {
-          name: s.name,
-          level: s.level,
-        });
-        toast.success("Skill updated.");
-      }
-      await refreshAll();
-    } catch {
-      toast.error("Could not save skill.");
-    }
-  };
+  /* ── References ──────────────────────────────────────────── */
+  const addReference = () => setReferences((l) => [...l, { id: uid(), name: "", position: "", email: "", phone: "" }]);
+  const removeReference = (id: string) => setReferences((l) => l.filter((r) => r.id !== id));
+  const updateReference = (id: string, field: keyof LocalReference, value: string) =>
+    setReferences((l) => l.map((r) => r.id === id ? { ...r, [field]: value } : r));
 
-  const removeSkill = async (s: CvSkill) => {
-    if (s.id < 0) {
-      setSkills((list) => list.filter((x) => x.id !== s.id));
-      return;
-    }
-    try {
-      await api.delete(`auth/cv/skill/${s.id}/delete/`);
-      await refreshAll();
-    } catch {
-      toast.error("Delete failed.");
-    }
-  };
-
-  const addLangLocal = () => {
-    setLanguages((list) => [
-      ...list,
-      { id: nextTemp(), name: "", level: "B1" },
-    ]);
-  };
-
-  const persistLanguage = async (l: CvLanguage) => {
-    if (!l.name.trim()) {
-      toast.error("Language name is required.");
-      return;
-    }
-    try {
-      if (l.id < 0) {
-        await api.post("auth/cv/language/", { name: l.name, level: l.level });
-        toast.success("Language added.");
-      } else {
-        await api.patch(`auth/cv/language/${l.id}/`, {
-          name: l.name,
-          level: l.level,
-        });
-        toast.success("Language updated.");
-      }
-      await refreshAll();
-    } catch {
-      toast.error("Could not save language.");
-    }
-  };
-
-  const removeLanguage = async (l: CvLanguage) => {
-    if (l.id < 0) {
-      setLanguages((list) => list.filter((x) => x.id !== l.id));
-      return;
-    }
-    try {
-      await api.delete(`auth/cv/language/${l.id}/delete/`);
-      await refreshAll();
-    } catch {
-      toast.error("Delete failed.");
-    }
-  };
-
-  const pct = score?.score ?? 0;
-
+  /* ================================================================
+     RENDER
+     ================================================================ */
   if (loading) {
     return (
       <DashboardLayout pageTitle="My CV">
-        <p style={{ padding: 24 }}>Loading your CV…</p>
+        <p style={{ padding: 24, color: "var(--sc-muted)" }}>Loading your CV…</p>
       </DashboardLayout>
     );
   }
 
   return (
     <DashboardLayout pageTitle="My CV">
+
+      {/* Hero */}
       <div className="page-hero cv-hero">
         <div className="hero-overlay" />
         <div className="hero-content">
-          <h1>Digital CV</h1>
-          <p>
-            Data is loaded and saved on the server. Completion score comes from
-            the backend.
-          </p>
+          <h1>Euro CV Builder</h1>
+          <p>Auto-filled from your profile · fully editable · export as PDF</p>
         </div>
       </div>
 
-      {score && (
-        <div className="card" style={{ margin: "16px 24px", padding: 16 }}>
+      {/* Score tips */}
+      {score && score.tips.length > 0 && (
+        <div className="card" style={{ margin: "16px 0 0", padding: 16 }}>
           <strong>{score.label}</strong>
-          {score.tips.length > 0 && (
-            <ul style={{ margin: "8px 0 0 18px", fontSize: 14 }}>
-              {score.tips.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-          )}
+          <ul style={{ margin: "8px 0 0 18px", fontSize: 13, color: "var(--sc-muted)" }}>
+            {score.tips.map((t) => <li key={t}>{t}</li>)}
+          </ul>
         </div>
       )}
 
+      {/* Top bar */}
       <div className="sc-cv-topbar">
         <div className="sc-cv-tabs">
-          <button
-            type="button"
-            className={`sc-cv-tab${tab === "edit" ? " active" : ""}`}
-            onClick={() => setTab("edit")}
-          >
-            <Edit3 size={15} /> Edit
+          <button type="button" className={`sc-cv-tab${tab === "edit" ? " active" : ""}`} onClick={() => setTab("edit")}>
+            <Edit3 size={15} /> Edit CV
           </button>
-          <button
-            type="button"
-            className={`sc-cv-tab${tab === "preview" ? " active" : ""}`}
-            onClick={() => setTab("preview")}
-          >
+          <button type="button" className={`sc-cv-tab${tab === "preview" ? " active" : ""}`} onClick={() => setTab("preview")}>
             <Eye size={15} /> Preview
           </button>
         </div>
         <div className="sc-cv-topbar-right">
           <CompletionBar pct={pct} />
-          <button
-            type="button"
-            className="sc-btn-outline"
-            onClick={() => void refreshAll()}
-          >
+          <button type="button" className="sc-btn-outline" onClick={() => void refreshAll()}>
             <RefreshCw size={14} /> Reload
           </button>
-          <button
-            type="button"
-            className="sc-btn-primary"
-            onClick={() => {
-              setTab("preview");
-              setTimeout(() => window.print(), 300);
-            }}
-          >
+          <button type="button" className="sc-btn-primary" onClick={handleExportPdf}>
             <Download size={14} /> Export PDF
           </button>
         </div>
       </div>
 
+      {/* ── EDIT TAB ──────────────────────────────────────────── */}
       {tab === "edit" && (
         <div className="sc-cv-form">
-          <SectionWrap icon={<LinkIcon size={16} />} title="Links & summary">
+
+          {/* PERSONAL INFO */}
+          <SectionWrap icon={<User size={16} />} title="Personal Information">
             <div className="sc-form-grid">
               <div className="sc-form-group">
-                <label>GitHub</label>
-                <input
-                  value={github}
-                  onChange={(e) => setGithub(e.target.value)}
-                  placeholder="https://github.com/..."
-                />
+                <label>First Name</label>
+                <input type="text" value={personal.firstName} onChange={(e) => updatePersonal("firstName", e.target.value)} />
+              </div>
+              <div className="sc-form-group">
+                <label>Last Name</label>
+                <input type="text" value={personal.lastName} onChange={(e) => updatePersonal("lastName", e.target.value)} />
+              </div>
+              <div className="sc-form-group">
+                <label>Date of Birth</label>
+                <input type="date" value={personal.dob} onChange={(e) => updatePersonal("dob", e.target.value)} />
+              </div>
+              <div className="sc-form-group">
+                <label>Nationality</label>
+                <input type="text" value={personal.nationality} onChange={(e) => updatePersonal("nationality", e.target.value)} />
+              </div>
+              <div className="sc-form-group">
+                <label>Email</label>
+                <input type="email" value={personal.email} onChange={(e) => updatePersonal("email", e.target.value)} />
+              </div>
+              <div className="sc-form-group">
+                <label>Phone</label>
+                <input type="tel" value={personal.phone} onChange={(e) => updatePersonal("phone", e.target.value)} />
+              </div>
+              <div className="sc-form-group">
+                <label>Address / City</label>
+                <input type="text" value={personal.address} onChange={(e) => updatePersonal("address", e.target.value)} />
               </div>
               <div className="sc-form-group">
                 <label>LinkedIn</label>
-                <input
-                  value={linkedin}
-                  onChange={(e) => setLinkedin(e.target.value)}
-                />
+                <input type="text" value={personal.linkedin} placeholder="linkedin.com/in/your-profile" onChange={(e) => updatePersonal("linkedin", e.target.value)} />
+              </div>
+              <div className="sc-form-group">
+                <label>GitHub</label>
+                <input type="text" value={personal.github} placeholder="github.com/username" onChange={(e) => updatePersonal("github", e.target.value)} />
               </div>
               <div className="sc-form-group">
                 <label>Portfolio</label>
-                <input
-                  value={portfolio}
-                  onChange={(e) => setPortfolio(e.target.value)}
-                />
+                <input type="text" value={personal.portfolio} placeholder="yourportfolio.com" onChange={(e) => updatePersonal("portfolio", e.target.value)} />
               </div>
               <div className="sc-form-group sc-col-full">
-                <label>Summary</label>
-                <textarea
-                  value={description}
-                  rows={4}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
+                <label>Professional Summary</label>
+                <textarea value={personal.summary} rows={4} onChange={(e) => updatePersonal("summary", e.target.value)} />
               </div>
             </div>
-            <button
-              type="button"
-              className="sc-btn-primary"
-              disabled={saving}
-              onClick={() => void saveGeneral()}
-            >
-              {saving ? "Saving…" : "Save summary & links"}
-            </button>
           </SectionWrap>
 
+          {/* EDUCATION */}
           <SectionWrap icon={<GraduationCap size={16} />} title="Education">
-            {educations.map((e, idx) => (
+            {education.map((e, idx) => (
               <div key={e.id} className="sc-cv-entry-block">
                 <div className="sc-cv-entry-block-header">
                   <span className="sc-cv-entry-num">Entry {idx + 1}</span>
-                  <button
-                    type="button"
-                    className="sc-cv-del-btn"
-                    onClick={() => void removeEducation(e)}
-                  >
+                  <button type="button" className="sc-cv-del-btn" onClick={() => void removeEducation(e)}>
                     <Trash2 size={13} />
                   </button>
                 </div>
                 <div className="sc-form-grid">
                   <div className="sc-form-group">
-                    <label>Degree</label>
-                    <input
-                      value={e.degree}
-                      onChange={(ev) =>
-                        setEducations((list) =>
-                          list.map((x) =>
-                            x.id === e.id
-                              ? { ...x, degree: ev.target.value }
-                              : x,
-                          ),
-                        )
-                      }
-                    />
+                    <label>Degree / Qualification</label>
+                    <input type="text" value={e.degree} placeholder="e.g. Licence Informatique"
+                      onChange={(ev) => updateEducation(e.id, "degree", ev.target.value)} />
                   </div>
                   <div className="sc-form-group">
                     <label>Institution</label>
-                    <input
-                      value={e.institution}
-                      onChange={(ev) =>
-                        setEducations((list) =>
-                          list.map((x) =>
-                            x.id === e.id
-                              ? { ...x, institution: ev.target.value }
-                              : x,
-                          ),
-                        )
-                      }
-                    />
+                    <input type="text" value={e.institution} placeholder="University name"
+                      onChange={(ev) => updateEducation(e.id, "institution", ev.target.value)} />
                   </div>
                   <div className="sc-form-group">
-                    <label>Field</label>
-                    <input
-                      value={e.field}
-                      onChange={(ev) =>
-                        setEducations((list) =>
-                          list.map((x) =>
-                            x.id === e.id
-                              ? { ...x, field: ev.target.value }
-                              : x,
-                          ),
-                        )
-                      }
-                    />
+                    <label>Start Date</label>
+                    <input type="text" value={e.startDate} placeholder="Sep 2021"
+                      onChange={(ev) => updateEducation(e.id, "startDate", ev.target.value)} />
                   </div>
                   <div className="sc-form-group">
-                    <label>Start year</label>
-                    <input
-                      type="number"
-                      value={e.start_year}
-                      onChange={(ev) =>
-                        setEducations((list) =>
-                          list.map((x) =>
-                            x.id === e.id
-                              ? { ...x, start_year: Number(ev.target.value) }
-                              : x,
-                          ),
-                        )
-                      }
-                    />
+                    <label>End Date</label>
+                    <input type="text" value={e.endDate} placeholder="Jun 2024 or Present"
+                      disabled={e.isCurrent}
+                      onChange={(ev) => updateEducation(e.id, "endDate", ev.target.value)} />
                   </div>
                   <div className="sc-form-group">
-                    <label>End year</label>
-                    <input
-                      type="number"
-                      disabled={e.is_current}
-                      value={e.end_year ?? ""}
-                      onChange={(ev) =>
-                        setEducations((list) =>
-                          list.map((x) =>
-                            x.id === e.id
-                              ? {
-                                  ...x,
-                                  end_year: ev.target.value
-                                    ? Number(ev.target.value)
-                                    : null,
-                                }
-                              : x,
-                          ),
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="sc-form-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={e.is_current}
-                        onChange={(ev) =>
-                          setEducations((list) =>
-                            list.map((x) =>
-                              x.id === e.id
-                                ? {
-                                    ...x,
-                                    is_current: ev.target.checked,
-                                    end_year: null,
-                                  }
-                                : x,
-                            ),
-                          )
-                        }
-                      />{" "}
-                      Current
+                    <label className="sc-checkbox-label">
+                      <input type="checkbox" checked={e.isCurrent}
+                        onChange={(ev) => {
+                          updateEducation(e.id, "isCurrent", ev.target.checked);
+                          if (ev.target.checked) updateEducation(e.id, "endDate", "");
+                        }} />
+                      Currently studying here
                     </label>
                   </div>
                   <div className="sc-form-group sc-col-full">
                     <label>Description</label>
-                    <textarea
-                      value={e.description}
-                      onChange={(ev) =>
-                        setEducations((list) =>
-                          list.map((x) =>
-                            x.id === e.id
-                              ? { ...x, description: ev.target.value }
-                              : x,
-                          ),
-                        )
-                      }
-                    />
+                    <textarea value={e.description} placeholder="Courses, achievements, GPA…"
+                      onChange={(ev) => updateEducation(e.id, "description", ev.target.value)} />
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="sc-btn-outline"
-                  onClick={() => void persistEducation(e)}
-                >
-                  <Check size={14} /> Save entry
-                </button>
               </div>
             ))}
-            <button
-              type="button"
-              className="sc-cv-add-btn"
-              onClick={addEducationLocal}
-            >
-              <Plus size={14} /> Add education
+            <button type="button" className="sc-cv-add-btn" onClick={addEducation}>
+              <Plus size={14} /> Add Education
             </button>
           </SectionWrap>
 
-          <SectionWrap icon={<Briefcase size={16} />} title="Experience">
-            {experiences.map((x, idx) => (
-              <div key={x.id} className="sc-cv-entry-block">
+          {/* EXPERIENCE */}
+          <SectionWrap icon={<Briefcase size={16} />} title="Work Experience">
+            {experience.map((e, idx) => (
+              <div key={e.id} className="sc-cv-entry-block">
                 <div className="sc-cv-entry-block-header">
                   <span className="sc-cv-entry-num">Entry {idx + 1}</span>
-                  <button
-                    type="button"
-                    className="sc-cv-del-btn"
-                    onClick={() => void removeExperience(x)}
-                  >
+                  <button type="button" className="sc-cv-del-btn" onClick={() => void removeExperience(e)}>
                     <Trash2 size={13} />
                   </button>
                 </div>
                 <div className="sc-form-grid">
                   <div className="sc-form-group">
-                    <label>Job title</label>
-                    <input
-                      value={x.job_title}
-                      onChange={(ev) =>
-                        setExperiences((list) =>
-                          list.map((r) =>
-                            r.id === x.id
-                              ? { ...r, job_title: ev.target.value }
-                              : r,
-                          ),
-                        )
-                      }
-                    />
+                    <label>Job Title</label>
+                    <input type="text" value={e.title} placeholder="e.g. Software Engineer Intern"
+                      onChange={(ev) => updateExperience(e.id, "title", ev.target.value)} />
                   </div>
                   <div className="sc-form-group">
-                    <label>Company</label>
-                    <input
-                      value={x.company}
-                      onChange={(ev) =>
-                        setExperiences((list) =>
-                          list.map((r) =>
-                            r.id === x.id
-                              ? { ...r, company: ev.target.value }
-                              : r,
-                          ),
-                        )
-                      }
-                    />
+                    <label>Company / Organisation</label>
+                    <input type="text" value={e.company} placeholder="Company name, city"
+                      onChange={(ev) => updateExperience(e.id, "company", ev.target.value)} />
                   </div>
                   <div className="sc-form-group">
                     <label>Location</label>
-                    <input
-                      value={x.location}
-                      onChange={(ev) =>
-                        setExperiences((list) =>
-                          list.map((r) =>
-                            r.id === x.id
-                              ? { ...r, location: ev.target.value }
-                              : r,
-                          ),
-                        )
-                      }
-                    />
+                    <input type="text" value={e.location} placeholder="City, Country"
+                      onChange={(ev) => updateExperience(e.id, "location", ev.target.value)} />
                   </div>
                   <div className="sc-form-group">
-                    <label>Start date (YYYY-MM-DD)</label>
-                    <input
-                      type="date"
-                      value={x.start_date}
-                      onChange={(ev) =>
-                        setExperiences((list) =>
-                          list.map((r) =>
-                            r.id === x.id
-                              ? { ...r, start_date: ev.target.value }
-                              : r,
-                          ),
-                        )
-                      }
-                    />
+                    <label>Start Date</label>
+                    <input type="text" value={e.startDate} placeholder="Jul 2023"
+                      onChange={(ev) => updateExperience(e.id, "startDate", ev.target.value)} />
                   </div>
                   <div className="sc-form-group">
-                    <label>End date</label>
-                    <input
-                      type="date"
-                      disabled={x.is_current}
-                      value={x.end_date ?? ""}
-                      onChange={(ev) =>
-                        setExperiences((list) =>
-                          list.map((r) =>
-                            r.id === x.id
-                              ? { ...r, end_date: ev.target.value || null }
-                              : r,
-                          ),
-                        )
-                      }
-                    />
+                    <label>End Date</label>
+                    <input type="text" value={e.endDate} placeholder="Sep 2023 or Present"
+                      disabled={e.isCurrent}
+                      onChange={(ev) => updateExperience(e.id, "endDate", ev.target.value)} />
                   </div>
                   <div className="sc-form-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={x.is_current}
-                        onChange={(ev) =>
-                          setExperiences((list) =>
-                            list.map((r) =>
-                              r.id === x.id
-                                ? {
-                                    ...r,
-                                    is_current: ev.target.checked,
-                                    end_date: null,
-                                  }
-                                : r,
-                            ),
-                          )
-                        }
-                      />{" "}
-                      Current
+                    <label className="sc-checkbox-label">
+                      <input type="checkbox" checked={e.isCurrent}
+                        onChange={(ev) => {
+                          updateExperience(e.id, "isCurrent", ev.target.checked);
+                          if (ev.target.checked) updateExperience(e.id, "endDate", "");
+                        }} />
+                      Currently working here
                     </label>
                   </div>
                   <div className="sc-form-group sc-col-full">
                     <label>Description</label>
-                    <textarea
-                      value={x.description}
-                      onChange={(ev) =>
-                        setExperiences((list) =>
-                          list.map((r) =>
-                            r.id === x.id
-                              ? { ...r, description: ev.target.value }
-                              : r,
-                          ),
-                        )
-                      }
-                    />
+                    <textarea value={e.description} placeholder="Key responsibilities and achievements…"
+                      onChange={(ev) => updateExperience(e.id, "description", ev.target.value)} />
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="sc-btn-outline"
-                  onClick={() => void persistExperience(x)}
-                >
-                  <Check size={14} /> Save entry
-                </button>
               </div>
             ))}
-            <button
-              type="button"
-              className="sc-cv-add-btn"
-              onClick={addExperienceLocal}
-            >
-              <Plus size={14} /> Add experience
+            <button type="button" className="sc-cv-add-btn" onClick={addExperience}>
+              <Plus size={14} /> Add Experience
             </button>
           </SectionWrap>
 
+          {/* SKILLS */}
           <SectionWrap icon={<Code2 size={16} />} title="Skills">
-            {skills.map((s) => (
-              <div
-                key={s.id}
-                className="sc-skill-row-edit"
-                style={{ marginBottom: 8 }}
-              >
-                <input
-                  className="sc-skill-name-input"
-                  value={s.name}
-                  placeholder="Skill"
-                  onChange={(e) =>
-                    setSkills((list) =>
-                      list.map((x) =>
-                        x.id === s.id ? { ...x, name: e.target.value } : x,
-                      ),
-                    )
-                  }
-                />
-                <select
-                  value={s.level}
-                  onChange={(e) =>
-                    setSkills((list) =>
-                      list.map((x) =>
-                        x.id === s.id
-                          ? { ...x, level: e.target.value as SkillLevel }
-                          : x,
-                      ),
-                    )
-                  }
-                  style={{ marginLeft: 8 }}
-                >
-                  {(
-                    ["beginner", "intermediate", "advanced", "expert"] as const
-                  ).map((lv) => (
-                    <option key={lv} value={lv}>
-                      {lv}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="sc-cv-del-btn"
-                  onClick={() => void removeSkill(s)}
-                >
-                  <Trash2 size={12} />
-                </button>
-                <button
-                  type="button"
-                  className="sc-btn-outline"
-                  style={{ marginLeft: 8 }}
-                  onClick={() => void persistSkill(s)}
-                >
-                  Save
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="sc-cv-add-btn"
-              onClick={addSkillLocal}
-            >
-              <Plus size={14} /> Add skill
+            <div className="sc-skills-grid" style={{ marginTop: 12, marginBottom: 8 }}>
+              {skills.map((sk) => (
+                <div key={sk.id} className="sc-skill-row-edit">
+                  <input
+                    className="sc-skill-name-input"
+                    type="text" value={sk.name} placeholder="Skill name"
+                    onChange={(e) => updateSkill(sk.id, "name", e.target.value)}
+                  />
+                  <SkillDots level={sk.level} onChange={(l) => updateSkill(sk.id, "level", l)} />
+                  <button type="button" className="sc-cv-del-btn" style={{ marginLeft: 4 }} onClick={() => void removeSkill(sk)}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="sc-cv-add-btn" onClick={addSkill}>
+              <Plus size={14} /> Add Skill
             </button>
           </SectionWrap>
 
+          {/* LANGUAGES */}
           <SectionWrap icon={<Globe size={16} />} title="Languages">
-            {languages.map((l) => (
-              <div
-                key={l.id}
-                className="sc-skill-row-edit"
-                style={{ marginBottom: 8 }}
-              >
-                <input
-                  className="sc-skill-name-input"
-                  value={l.name}
-                  placeholder="Language"
-                  onChange={(e) =>
-                    setLanguages((list) =>
-                      list.map((x) =>
-                        x.id === l.id ? { ...x, name: e.target.value } : x,
-                      ),
-                    )
-                  }
-                />
-                <select
-                  value={l.level}
-                  onChange={(e) =>
-                    setLanguages((list) =>
-                      list.map((x) =>
-                        x.id === l.id
-                          ? { ...x, level: e.target.value as LangLevel }
-                          : x,
-                      ),
-                    )
-                  }
-                  style={{ marginLeft: 8 }}
-                >
-                  {(
-                    ["A1", "A2", "B1", "B2", "C1", "C2", "native"] as const
-                  ).map((lv) => (
-                    <option key={lv} value={lv}>
-                      {lv}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="sc-cv-del-btn"
-                  onClick={() => void removeLanguage(l)}
-                >
-                  <Trash2 size={12} />
-                </button>
-                <button
-                  type="button"
-                  className="sc-btn-outline"
-                  style={{ marginLeft: 8 }}
-                  onClick={() => void persistLanguage(l)}
-                >
-                  Save
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="sc-cv-add-btn"
-              onClick={addLangLocal}
-            >
-              <Plus size={14} /> Add language
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12, marginBottom: 8 }}>
+              {languages.map((l) => (
+                <div key={l.id} className="sc-skill-row-edit">
+                  <input
+                    className="sc-skill-name-input"
+                    type="text" value={l.name} placeholder="Language"
+                    onChange={(e) => updateLanguage(l.id, "name", e.target.value)}
+                  />
+                  <select
+                    className="sc-lang-select" value={l.level}
+                    onChange={(e) => updateLanguage(l.id, "level", e.target.value)}
+                  >
+                    {LANG_LEVELS.map((lv) => (
+                      <option key={lv} value={lv}>{lv}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="sc-cv-del-btn" onClick={() => void removeLanguage(l)}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="sc-cv-add-btn" onClick={addLanguage}>
+              <Plus size={14} /> Add Language
             </button>
           </SectionWrap>
+
+          {/* HOBBIES */}
+          <SectionWrap icon={<Heart size={16} />} title="Hobbies & Interests">
+            <div className="sc-hobbies-wrap">
+              {hobbies.map((h) => (
+                <div key={h.id} className="sc-hobby-chip-edit">
+                  <input type="text" value={h.value} placeholder="Hobby"
+                    onChange={(e) => updateHobby(h.id, e.target.value)} />
+                  <button type="button" onClick={() => removeHobby(h.id)}>✕</button>
+                </div>
+              ))}
+              <button type="button" className="sc-cv-add-btn sc-hobby-add" onClick={addHobby}>
+                <Plus size={13} /> Add
+              </button>
+            </div>
+          </SectionWrap>
+
+          {/* REFERENCES */}
+          <SectionWrap icon={<Users size={16} />} title="References">
+            {references.map((r, idx) => (
+              <div key={r.id} className="sc-cv-entry-block">
+                <div className="sc-cv-entry-block-header">
+                  <span className="sc-cv-entry-num">Reference {idx + 1}</span>
+                  <button type="button" className="sc-cv-del-btn" onClick={() => removeReference(r.id)}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+                <div className="sc-form-grid">
+                  <div className="sc-form-group">
+                    <label>Full Name</label>
+                    <input type="text" value={r.name} placeholder="Dr. Jane Smith"
+                      onChange={(e) => updateReference(r.id, "name", e.target.value)} />
+                  </div>
+                  <div className="sc-form-group">
+                    <label>Position / Institution</label>
+                    <input type="text" value={r.position} placeholder="Prof. of CS — UFMC1"
+                      onChange={(e) => updateReference(r.id, "position", e.target.value)} />
+                  </div>
+                  <div className="sc-form-group">
+                    <label>Email</label>
+                    <input type="email" value={r.email} placeholder="jane.smith@university.dz"
+                      onChange={(e) => updateReference(r.id, "email", e.target.value)} />
+                  </div>
+                  <div className="sc-form-group">
+                    <label>Phone</label>
+                    <input type="tel" value={r.phone} placeholder="+213 XX XXX XXXX"
+                      onChange={(e) => updateReference(r.id, "phone", e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button type="button" className="sc-cv-add-btn" onClick={addReference}>
+              <Plus size={14} /> Add Reference
+            </button>
+          </SectionWrap>
+
+          {/* Form actions */}
+          <div className="sc-cv-form-actions">
+            <button type="button" className="sc-btn-outline" onClick={resetToProfile}>
+              <RotateCcw size={14} /> Reset to Profile
+            </button>
+            <button type="button" className="sc-btn-outline" onClick={() => setTab("preview")}>
+              <Eye size={14} /> Preview CV
+            </button>
+            <button type="button" className="sc-btn-primary" disabled={saving} onClick={() => void handleSave()}>
+              {saved ? <><Check size={14} /> Saved!</> : saving ? "Saving…" : "Save CV"}
+            </button>
+          </div>
+
         </div>
       )}
 
+      {/* ── PREVIEW TAB ───────────────────────────────────────── */}
       {tab === "preview" && (
         <div className="sc-cv-preview-tab">
           <div className="sc-cv-preview-actions">
-            <button
-              type="button"
-              className="sc-btn-outline"
-              onClick={() => setTab("edit")}
-            >
-              <Edit3 size={14} /> Edit
-            </button>
+            <span style={{ fontSize: 13, color: "var(--sc-muted)" }}>
+              A4 Preview — Euro CV Format
+            </span>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button type="button" className="sc-btn-outline" onClick={() => setTab("edit")}>
+                <Edit3 size={14} /> Edit
+              </button>
+              <button type="button" className="sc-btn-primary" onClick={handleExportPdf}>
+                <Download size={14} /> Download PDF
+              </button>
+            </div>
           </div>
           <div className="sc-cv-preview-container">
-            <EuroCvPreview
-              fullName={fullName}
-              email={email}
-              phone={phone}
-              town={town}
-              summary={description}
-              github={github}
-              linkedin={linkedin}
-              portfolio={portfolio}
-              educations={educations.filter((e) => e.id > 0)}
-              experiences={experiences.filter((x) => x.id > 0)}
-              skills={skills.filter((s) => s.id > 0)}
-              languages={languages.filter((l) => l.id > 0)}
+            <EuroCv
+              personal={personal}
+              education={education}
+              experience={experience}
+              skills={skills}
+              languages={languages}
+              hobbies={hobbies}
+              references={references}
             />
           </div>
         </div>
       )}
+
     </DashboardLayout>
   );
-}
+};
+
+export default MyCv;

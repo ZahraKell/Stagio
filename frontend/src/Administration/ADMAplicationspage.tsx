@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "../components/DashboardLayout";
-import { CheckCircle, XCircle, RefreshCw, X, AlertTriangle } from "lucide-react";
+import {
+  CheckCircle, XCircle, RefreshCw, X, AlertTriangle,
+  ArrowRight, FileText, Clock, CheckSquare, XSquare,
+} from "lucide-react";
+import { Link } from "react-router-dom";
 import api from "../api";
 import toast from "react-hot-toast";
 
@@ -24,7 +28,7 @@ function unwrapApps(res: { data: unknown }): AppRow[] {
 }
 
 /* ══════════════════════════════════════════════════════════
-   REJECT MODAL — mirrors company ConventionPopup style
+   REJECT MODAL
    ══════════════════════════════════════════════════════════ */
 function RejectModal({
   app,
@@ -35,9 +39,9 @@ function RejectModal({
   onClose: () => void;
   onRejected: () => void;
 }) {
-  const [reason,     setReason]     = useState("");
+  const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [done,       setDone]       = useState(false);
+  const [done, setDone] = useState(false);
 
   const handleReject = async () => {
     if (!reason.trim()) {
@@ -48,9 +52,7 @@ function RejectModal({
     try {
       await api.put(`applications/${app.id}/reject/`, { reason });
       setDone(true);
-      setTimeout(() => {
-        onRejected();
-      }, 1600);
+      setTimeout(() => { onRejected(); }, 1600);
     } catch {
       toast.error("Rejection failed. Check application status and permissions.");
       setSubmitting(false);
@@ -63,68 +65,47 @@ function RejectModal({
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="conv-popup" style={{ maxWidth: 480 }}>
-
-        {/* Header */}
         <div className="conv-head">
           <div className="conv-head-icon" style={{ background: "#fee2e2", color: "#dc2626" }}>
             <XCircle size={22} />
           </div>
           <div>
             <h3>Reject Internship Convention</h3>
-            <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>
-              Application #{app.id}
-            </p>
+            <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>Application #{app.id}</p>
           </div>
           {!done && (
-            <button className="conv-close" onClick={onClose}>
-              <X size={16} />
-            </button>
+            <button className="conv-close" onClick={onClose}><X size={16} /></button>
           )}
         </div>
 
         {done ? (
-          /* Success state */
           <div className="conv-success">
             <div className="conv-success-icon" style={{ fontSize: 36 }}>❌</div>
             <h3>Convention Rejected</h3>
-            <p>
-              The student and company have been notified with the reason provided.
-            </p>
+            <p>The student and company have been notified with the reason provided.</p>
           </div>
         ) : (
           <>
             <div className="conv-body">
-
-              {/* Summary */}
               <div className="conv-summary">
                 <div className="conv-summary-item">
-                  <span>Student</span>
-                  <strong>{app.student_name}</strong>
+                  <span>Student</span><strong>{app.student_name}</strong>
                 </div>
                 <div className="conv-summary-item">
-                  <span>Email</span>
-                  <strong style={{ fontSize: 12 }}>{app.student_email}</strong>
+                  <span>Email</span><strong style={{ fontSize: 12 }}>{app.student_email}</strong>
                 </div>
                 <div className="conv-summary-item">
-                  <span>Offer</span>
-                  <strong>{app.offer_title}</strong>
+                  <span>Offer</span><strong>{app.offer_title}</strong>
                 </div>
                 <div className="conv-summary-item">
-                  <span>Company</span>
-                  <strong>{app.offer_company_name || "—"}</strong>
+                  <span>Company</span><strong>{app.offer_company_name || "—"}</strong>
                 </div>
               </div>
 
-              {/* Warning */}
               <div className="conv-explainer" style={{
-                background: "#fff7ed",
-                border: "1px solid #fed7aa",
-                borderRadius: 10,
-                padding: "12px 14px",
-                display: "flex",
-                gap: 10,
-                alignItems: "flex-start",
-                margin: "12px 0",
+                background: "#fff7ed", border: "1px solid #fed7aa",
+                borderRadius: 10, padding: "12px 14px",
+                display: "flex", gap: 10, alignItems: "flex-start", margin: "12px 0",
               }}>
                 <AlertTriangle size={16} style={{ color: "#ea580c", flexShrink: 0, marginTop: 2 }} />
                 <p style={{ margin: 0, fontSize: 13, color: "#7c2d12", lineHeight: 1.5 }}>
@@ -134,7 +115,6 @@ function RejectModal({
                 </p>
               </div>
 
-              {/* Reason textarea */}
               <div style={{ marginTop: 4 }}>
                 <label style={{
                   display: "block", fontSize: 13, fontWeight: 600,
@@ -148,18 +128,10 @@ function RejectModal({
                   placeholder="e.g. The student's CV is incomplete. Please add more skills and experience before reapplying."
                   rows={4}
                   style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    border: reason.trim()
-                      ? "1px solid #d1d5db"
-                      : "1px solid #fca5a5",
-                    fontSize: 13,
-                    lineHeight: 1.6,
-                    resize: "vertical",
-                    outline: "none",
-                    fontFamily: "inherit",
-                    boxSizing: "border-box",
+                    width: "100%", padding: "10px 12px", borderRadius: 8,
+                    border: reason.trim() ? "1px solid #d1d5db" : "1px solid #fca5a5",
+                    fontSize: 13, lineHeight: 1.6, resize: "vertical",
+                    outline: "none", fontFamily: "inherit", boxSizing: "border-box",
                   }}
                 />
                 <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
@@ -168,24 +140,15 @@ function RejectModal({
               </div>
             </div>
 
-            {/* Footer */}
             <div className="conv-footer">
-              <button className="conv-btn-cancel" onClick={onClose}>
-                Cancel
-              </button>
+              <button className="conv-btn-cancel" onClick={onClose}>Cancel</button>
               <button
                 style={{
-                  padding: "10px 20px",
-                  borderRadius: 8,
-                  border: "none",
-                  fontWeight: 600,
-                  fontSize: 14,
+                  padding: "10px 20px", borderRadius: 8, border: "none",
+                  fontWeight: 600, fontSize: 14,
                   cursor: reason.trim() && !submitting ? "pointer" : "not-allowed",
                   background: reason.trim() ? "#dc2626" : "#fca5a5",
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
+                  color: "#fff", display: "flex", alignItems: "center", gap: 6,
                   transition: "background 0.15s",
                 }}
                 disabled={!reason.trim() || submitting}
@@ -203,7 +166,7 @@ function RejectModal({
 }
 
 /* ══════════════════════════════════════════════════════════
-   VALIDATE CONFIRM MODAL
+   VALIDATE MODAL
    ══════════════════════════════════════════════════════════ */
 function ValidateModal({
   app,
@@ -215,7 +178,7 @@ function ValidateModal({
   onValidated: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
-  const [done,       setDone]       = useState(false);
+  const [done, setDone] = useState(false);
 
   const handleValidate = async () => {
     setSubmitting(true);
@@ -235,7 +198,6 @@ function ValidateModal({
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="conv-popup" style={{ maxWidth: 440 }}>
-
         <div className="conv-head">
           <div className="conv-head-icon" style={{ background: "#dcfce7", color: "#16a34a" }}>
             <CheckCircle size={22} />
@@ -263,27 +225,20 @@ function ValidateModal({
             <div className="conv-body">
               <div className="conv-summary">
                 <div className="conv-summary-item">
-                  <span>Student</span>
-                  <strong>{app.student_name}</strong>
+                  <span>Student</span><strong>{app.student_name}</strong>
                 </div>
                 <div className="conv-summary-item">
-                  <span>Offer</span>
-                  <strong>{app.offer_title}</strong>
+                  <span>Offer</span><strong>{app.offer_title}</strong>
                 </div>
                 <div className="conv-summary-item">
-                  <span>Company</span>
-                  <strong>{app.offer_company_name || "—"}</strong>
+                  <span>Company</span><strong>{app.offer_company_name || "—"}</strong>
                 </div>
               </div>
 
               <div className="conv-explainer" style={{
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                borderRadius: 10,
-                padding: "12px 14px",
-                display: "flex",
-                gap: 10,
-                marginTop: 12,
+                background: "#f0fdf4", border: "1px solid #bbf7d0",
+                borderRadius: 10, padding: "12px 14px",
+                display: "flex", gap: 10, marginTop: 12,
               }}>
                 <CheckCircle size={16} style={{ color: "#16a34a", flexShrink: 0, marginTop: 2 }} />
                 <p style={{ margin: 0, fontSize: 13, color: "#14532d", lineHeight: 1.5 }}>
@@ -293,7 +248,6 @@ function ValidateModal({
                 </p>
               </div>
 
-              {/* Signature chain */}
               <div className="conv-chain" style={{ marginTop: 16 }}>
                 <div className="conv-chain-step conv-chain-done">
                   <span className="conv-chain-dot">✓</span>
@@ -331,11 +285,30 @@ function ValidateModal({
 }
 
 /* ══════════════════════════════════════════════════════════
+   STATUS HELPERS
+   ══════════════════════════════════════════════════════════ */
+const statusBadgeClass = (s: string) => {
+  if (s === "accepted") return "as-accepted";
+  if (s === "validated") return "as-validated";
+  if (s === "refused") return "as-refused";
+  if (s === "rejected") return "as-rejected";
+  return "as-pending";
+};
+
+function initials(name: string) {
+  return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+}
+
+function countByStatus(rows: AppRow[], s: string) {
+  return rows.filter(r => r.status === s).length;
+}
+
+/* ══════════════════════════════════════════════════════════
    MAIN PAGE
    ══════════════════════════════════════════════════════════ */
-const ADMAplicationspage: React.FC = () => {
-  const [rows,         setRows]         = useState<AppRow[]>([]);
-  const [loading,      setLoading]      = useState(true);
+const ADMApplicationsPage: React.FC = () => {
+  const [rows, setRows] = useState<AppRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [rejectTarget, setRejectTarget] = useState<AppRow | null>(null);
   const [validateTarget, setValidateTarget] = useState<AppRow | null>(null);
 
@@ -353,114 +326,187 @@ const ADMAplicationspage: React.FC = () => {
 
   useEffect(() => { void load(); }, []);
 
-  const statusBadgeClass = (s: string) => {
-    if (s === "accepted")  return "as-accepted";
-    if (s === "validated") return "as-validated";
-    if (s === "refused")   return "as-refused";
-    return "as-pending";
-  };
-
   return (
     <DashboardLayout pageTitle="Applications">
+      <div className="adm-applications-page">
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <button type="button" className="adm-action-btn approve sm" onClick={() => void load()}>
-          <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
-
-      {loading ? (
-        <p style={{ padding: 24 }}>Loading…</p>
-      ) : (
-        <div className="adm-table-wrap">
-          <table className="adm-table">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Offer</th>
-                <th>Company</th>
-                <th>Status</th>
-                <th>Date</th>
-                <th style={{ minWidth: 180 }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(a => (
-                <tr key={a.id}>
-                  <td>
-                    <div className="fw-medium">{a.student_name}</div>
-                    <div className="text-muted small">{a.student_email}</div>
-                  </td>
-                  <td>{a.offer_title}</td>
-                  <td>{a.offer_company_name || "—"}</td>
-                  <td>
-                    <span className={`app-status-badge ${statusBadgeClass(a.status)}`}>
-                      {a.status}
-                    </span>
-                  </td>
-                  <td className="text-muted">
-                    {a.application_date ? String(a.application_date).slice(0, 10) : "—"}
-                  </td>
-                  <td>
-                    {a.status === "accepted" && (
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button
-                          type="button"
-                          className="adm-action-btn approve sm"
-                          onClick={() => setValidateTarget(a)}
-                        >
-                          <CheckCircle size={13} /> Validate
-                        </button>
-                        <button
-                          type="button"
-                          className="adm-action-btn reject sm"
-                          onClick={() => setRejectTarget(a)}
-                        >
-                          <XCircle size={13} /> Reject
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length === 0 && (
-            <p className="text-muted" style={{ padding: 16 }}>
-              No applications in your scope.
-            </p>
-          )}
+        {/* ── HERO ── */}
+        <div className="page-hero adm-applications-hero">
+          <div className="hero-overlay" />
+          <div className="hero-content">
+            <h1>Applications</h1>
+            <p>Review and validate internship applications within your scope.</p>
+          </div>
         </div>
-      )}
 
-      {/* Validate confirmation modal */}
-      {validateTarget && (
-        <ValidateModal
-          app={validateTarget}
-          onClose={() => setValidateTarget(null)}
-          onValidated={() => {
-            setValidateTarget(null);
-            toast.success("Internship validated successfully.");
-            void load();
-          }}
-        />
-      )}
+        {/* ── STATS STRIP ── */}
+        {!loading && (
+          <div className="adm-app-stats">
+            <div className="adm-app-stat">
+              <div className="adm-app-stat-icon total">
+                <FileText size={18} />
+              </div>
+              <div>
+                <div className="adm-app-stat-label">Total</div>
+                <div className="adm-app-stat-val">{rows.length}</div>
+              </div>
+            </div>
+            <div className="adm-app-stat">
+              <div className="adm-app-stat-icon accepted">
+                <CheckSquare size={18} />
+              </div>
+              <div>
+                <div className="adm-app-stat-label">Accepted</div>
+                <div className="adm-app-stat-val">{countByStatus(rows, "accepted")}</div>
+              </div>
+            </div>
+            <div className="adm-app-stat">
+              <div className="adm-app-stat-icon pending">
+                <Clock size={18} />
+              </div>
+              <div>
+                <div className="adm-app-stat-label">Pending</div>
+                <div className="adm-app-stat-val">{countByStatus(rows, "pending")}</div>
+              </div>
+            </div>
+            <div className="adm-app-stat">
+              <div className="adm-app-stat-icon rejected">
+                <XSquare size={18} />
+              </div>
+              <div>
+                <div className="adm-app-stat-label">Rejected</div>
+                <div className="adm-app-stat-val">
+                  {countByStatus(rows, "refused") + countByStatus(rows, "rejected")}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-      {/* Reject with reason modal */}
-      {rejectTarget && (
-        <RejectModal
-          app={rejectTarget}
-          onClose={() => setRejectTarget(null)}
-          onRejected={() => {
-            setRejectTarget(null);
-            toast.success("Application rejected and student notified.");
-            void load();
-          }}
-        />
-      )}
+        {/* ── MAIN CARD ── */}
+        <section className="adm-card">
+          <div className="adm-card-head">
+            <div>
+              <h2>All Applications</h2>
+              <p>{rows.length} application{rows.length !== 1 ? "s" : ""} in your scope</p>
+            </div>
+            <div className="adm-actions">
+              <Link to="/admin/conventions" className="adm-btn-link">
+                Conventions <ArrowRight size={13} />
+              </Link>
+              <button
+                type="button"
+                className="adm-action-btn approve sm"
+                onClick={() => void load()}
+              >
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+          </div>
 
+          {loading ? (
+            <p style={{ padding: "28px 20px", color: "var(--sc-muted)", fontSize: 13 }}>
+              Loading…
+            </p>
+          ) : (
+            <div className="adm-table-wrap">
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Offer</th>
+                    <th>Company</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th style={{ minWidth: 180 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(a => (
+                    <tr key={a.id}>
+                      <td>
+                        <div className="adm-student-cell">
+                          <div className="adm-student-avatar">
+                            {initials(a.student_name)}
+                          </div>
+                          <div>
+                            <div className="fw-medium">{a.student_name}</div>
+                            <div className="adm-cell-sub">{a.student_email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>{a.offer_title}</td>
+                      <td className="fw-medium">{a.offer_company_name || "—"}</td>
+                      <td>
+                        <span className={`app-status-badge ${statusBadgeClass(a.status)}`}>
+                          {a.status}
+                        </span>
+                      </td>
+                      <td className="text-muted">
+                        {a.application_date ? String(a.application_date).slice(0, 10) : "—"}
+                      </td>
+                      <td>
+                        {a.status === "accepted" && (
+                          <div className="adm-actions">
+                            <button
+                              type="button"
+                              className="adm-action-btn approve sm"
+                              onClick={() => setValidateTarget(a)}
+                            >
+                              <CheckCircle size={13} /> Validate
+                            </button>
+                            <button
+                              type="button"
+                              className="adm-action-btn reject sm"
+                              onClick={() => setRejectTarget(a)}
+                            >
+                              <XCircle size={13} /> Reject
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {rows.length === 0 && (
+                <p className="text-muted" style={{ padding: "32px 20px", textAlign: "center" }}>
+                  No applications in your scope.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* ── MODALS ── */}
+        {validateTarget && (
+          <ValidateModal
+            app={validateTarget}
+            onClose={() => setValidateTarget(null)}
+            onValidated={() => {
+              setValidateTarget(null);
+              toast.success("Internship validated successfully.");
+              void load();
+            }}
+          />
+        )}
+
+        {rejectTarget && (
+          <RejectModal
+            app={rejectTarget}
+            onClose={() => setRejectTarget(null)}
+            onRejected={() => {
+              setRejectTarget(null);
+              toast.success("Application rejected and student notified.");
+              void load();
+            }}
+          />
+        )}
+
+      </div>
     </DashboardLayout>
   );
 };
 
-export default ADMAplicationspage;
+export default ADMApplicationsPage;

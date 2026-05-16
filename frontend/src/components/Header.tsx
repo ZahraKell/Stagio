@@ -7,41 +7,41 @@ import { getUserRole, clearTokens, getAccessToken } from "../auth";
 type UserRole = "student" | "company" | "admin" | "administration" | null;
 
 const ROLE_DASHBOARD: Record<string, string> = {
-  student:        "/student",
-  company:        "/company",
-  admin:          "/admin/dashboard",
+  student: "/student",
+  company: "/company",
+  admin: "/admin/dashboard",
   administration: "/administration",
 };
 const ROLE_PROFILE: Record<string, string> = {
-  student:        "/student/profile",
-  company:        "/company/profile",
-  admin:          "/admin/dashboard",
+  student: "/student/profile",
+  company: "/company/profile",
+  admin: "/admin/dashboard",
   administration: "/administration/profile",
 };
 const ROLE_LABEL: Record<string, string> = {
-  student:        "Student Portal",
-  company:        "Company Portal",
-  admin:          "Admin Panel",
+  student: "Student Portal",
+  company: "Company Portal",
+  admin: "Admin Panel",
   administration: "Administration",
 };
 const ROLE_COLOR: Record<string, string> = {
-  student:        "#a855f7",
-  company:        "#f59e0b",
-  admin:          "#ef4444",
+  student: "#a855f7",
+  company: "#f59e0b",
+  admin: "#ef4444",
   administration: "#3b82f6",
 };
 
 const PICTURE_KEY = "profile_picture_url";
 
 export default function Header() {
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
-  const [role,       setRole]       = useState<UserRole>(null);
-  const [initials,   setInitials]   = useState("");
-  const [fullName,   setFullName]   = useState("");
+  const [role, setRole] = useState<UserRole>(null);
+  const [initials, setInitials] = useState("");
+  const [fullName, setFullName] = useState("");
   const [pictureUrl, setPictureUrl] = useState<string | null>(null);
-  const [dropOpen,   setDropOpen]   = useState(false);
+  const [dropOpen, setDropOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
 
   // Scroll listener — original behaviour
@@ -70,9 +70,9 @@ export default function Header() {
         const name = (r === "company" ? u.company_name : u.full_name) || "";
         setFullName(name);
         const parts = name.trim().split(/\s+/).filter(Boolean);
-        if (parts.length >= 2)       setInitials(`${parts[0][0]}${parts[1][0]}`.toUpperCase());
+        if (parts.length >= 2) setInitials(`${parts[0][0]}${parts[1][0]}`.toUpperCase());
         else if (parts.length === 1) setInitials(parts[0].slice(0, 2).toUpperCase());
-        else                         setInitials(r ? r[0].toUpperCase() : "U");
+        else setInitials(r ? r[0].toUpperCase() : "U");
       } else {
         setInitials(r ? r[0].toUpperCase() : "U");
       }
@@ -107,11 +107,11 @@ export default function Header() {
         </Link>
         <ul className="hs-nav-links">
           <li><Link to="/offers">Offers</Link></li>
-          <li><Link to="/Testimonials">Stories</Link></li>
+          <li><Link to="/Testimonials">Testimonials</Link></li>
           <li><Link to="/FAQ">FAQ</Link></li>
           <li><Link to="/Companies">Companies</Link></li>
           <li><Link to="/Blog">Blog</Link></li>
-          <li><Link to="/about">À propos</Link></li>
+          <li><Link to="/about">About us</Link></li>
           <li><Link to="/contact">Contact us</Link></li>
         </ul>
       </div>
@@ -183,21 +183,21 @@ export default function Header() {
 /* ── Tiny inline SVG icons so we don't bloat lucide imports ────────────────── */
 const DashIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}>
-    <rect x="3" y="3" width="7" height="7" rx="1"/>
-    <rect x="14" y="3" width="7" height="7" rx="1"/>
-    <rect x="14" y="14" width="7" height="7" rx="1"/>
-    <rect x="3" y="14" width="7" height="7" rx="1"/>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
   </svg>
 );
 const UserIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}>
-    <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
   </svg>
 );
 const LogoutIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}>
-    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-    <polyline points="16 17 21 12 16 7"/>
-    <line x1="21" y1="12" x2="9" y2="12"/>
+    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
   </svg>
 );

@@ -2,26 +2,32 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import studentImg from "./assets/student.jpg";
 import companyImg from "./assets/company.jpg";
-import block1Img from "./assets/block1.png";
+import block1Img from "./assets/post.png";
 
-const CDN = "https://cdn.sanity.io/images/mz2hls6g/eu-production";
-const IMG = {
-  disney: `${CDN}/36fae29e83553cc41e52e0c9baf24cfbd74f20b9-172x115.svg`,
-  tiktok: `${CDN}/38b6560cebcb55bad54b72f0df8a0b0848d758f2-172x115.svg`,
-  db: `${CDN}/58bbbb6e0b8725633eb8ad7b246c82b07e9dde22-172x115.svg`,
-  pg: `${CDN}/fa09a365c8dc9f3691e1c9d60673aa837b87a19f-172x115.svg`,
-  nike: `${CDN}/62198d0a16e0d03e1d476760fc5c049a3b959128-172x115.svg`,
-  ey: `${CDN}/c382c65c6cbbd3d7ca896a0df09182afb757958d-172x115.svg`,
-};
+import logo1 from "./assets/air.png";
+import logo2 from "./assets/algerietelecom.png";
+import logo3 from "./assets/biofarm.png";
+import logo4 from "./assets/oredo.png";
+import logo5 from "./assets/sonatrach.png";
+import logo6 from "./assets/in.png";
+
+const PARTNERS: [string, string, string][] = [
+  [logo1, "Air Algérie", "https://www.airalgerie.dz"],
+  [logo2, "Algérie Télécom", "https://www.algerietelecom.dz"],
+  [logo3, "Biofarm", "https://www.biofarm.dz"],
+  [logo4, "Ooredoo", "https://www.ooredoo.dz"],
+  [logo5, "Sonatrach", "https://www.sonatrach.dz"],
+  [logo6, "Investissement", "https://www.andi.dz"],
+];
 
 const graduatedStudents = [
   {
     name: "Sarah Ahmed",
-    role: "Développeuse Full Stack",
+    role: "Full Stack Developer",
     company: "Microsoft",
     avatar: "https://randomuser.me/api/portraits/women/68.jpg",
     quote:
-      "Grâce à Stag.io, j'ai décroché un stage chez Microsoft qui s'est transformé en CDI. La plateforme m'a ouvert des portes que je n'aurais jamais imaginées.",
+      "Thanks to Stag.io, I landed an internship at Microsoft that turned into a full-time offer. The platform opened doors I never thought possible.",
   },
   {
     name: "Karim Benali",
@@ -29,7 +35,7 @@ const graduatedStudents = [
     company: "Google",
     avatar: "https://randomuser.me/api/portraits/men/32.jpg",
     quote:
-      "Les offres personnalisées et la messagerie directe avec les recruteurs ont changé ma recherche. Aujourd'hui je suis Data Scientist chez Google.",
+      "The personalised offers and direct messaging with recruiters transformed my job search. Today I'm a Data Scientist at Google.",
   },
   {
     name: "Leila Mansouri",
@@ -37,24 +43,24 @@ const graduatedStudents = [
     company: "Amazon",
     avatar: "https://randomuser.me/api/portraits/women/44.jpg",
     quote:
-      "Stag.io m'a aidée à trouver un stage en product management qui correspondait parfaitement à mes aspirations. Une expérience inoubliable.",
+      "Stag.io helped me find a product management internship that perfectly matched my ambitions. An unforgettable experience.",
   },
   {
     name: "Mehdi Kaci",
-    role: "Consultant Stratégie",
+    role: "Strategy Consultant",
     company: "Deloitte",
     avatar: "https://randomuser.me/api/portraits/men/75.jpg",
     quote:
-      "Les événements de networking organisés sur la plateforme m'ont permis de rencontrer des professionnels clés. Je recommande vivement.",
+      "The networking events organised on the platform let me meet key professionals. I highly recommend it.",
   },
 ];
 
-// ---------- Split Hero Component ----------
+// ---------- Split Hero ----------
 function SplitHero() {
   const navigate = useNavigate();
   const [hovered, setHovered] = useState<string | null>(null);
   const flex = (id: string) =>
-    hovered === id ? 1.7 : hovered !== null ? 0.5 : 1;
+    hovered === id ? 1.4 : hovered !== null ? 0.7 : 1;
 
   return (
     <div className="hs-hero-wrap">
@@ -77,16 +83,17 @@ function SplitHero() {
             companies, <br />
             and take the next step in your career with confidence.
           </p>
-          {/* FIX 1: navigate to /login with ?role=etudiant so AuthPage pre-fills role */}
           <button
             className="hs-panel-btn"
-            onClick={() => navigate("/login?role=etudiant")}
+            onClick={() => navigate("/offers")}
           >
             Explore opportunities →
           </button>
         </div>
       </div>
+
       <div className="hs-panel-divider" />
+
       <div
         className="hs-panel"
         style={{
@@ -105,7 +112,6 @@ function SplitHero() {
             Publish your internship offers, reach qualified students, <br />
             and manage applications efficiently from one platform.
           </p>
-          {/* FIX 1: navigate to /login with ?role=entreprise */}
           <button
             className="hs-panel-btn"
             onClick={() => navigate("/login?role=entreprise")}
@@ -118,16 +124,17 @@ function SplitHero() {
   );
 }
 
-// ---------- Scroll Color Section (5 blocks) ----------
+// ---------- Scroll Color Section ----------
 function ScrollColorSection() {
+  const navigate = useNavigate();
   const [activeBlock, setActiveBlock] = useState(0);
   const blockRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const bgColors = [
     "#F5EBD3",
-    "#E8D2A8",
-    "#C8965E",
-    "#B8893E",
+    "#eccf99",
+    "#dc9365",
+    "#e09898",
     "#5C1F2E",
   ];
 
@@ -151,40 +158,15 @@ function ScrollColorSection() {
     return () => observer.disconnect();
   }, []);
 
-  // FIX 2: Use window.location.href for mailto so it opens in the user's
-  // default mail client (Gmail app / Outlook / etc.) instead of a new tab.
-  const handleJoinCommunity = () => {
-    const to = "fzahrakell@gmail.com";
-    const subject = "Demande d'inscription - Administration universitaire";
-    const body = `Bonjour l'équipe StageConnect,
-
-Je souhaite inscrire mon université sur votre plateforme.
-
-Université : [À compléter]
-Ville : [À compléter]
-Nom : [À compléter]
-Fonction : [À compléter]
-Email : [À compléter]
-
-Merci de me transmettre la procédure d'inscription.
-
-Cordialement,`;
-
-    // Use window.location.href — this triggers the OS mail handler directly
-    window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
-
   return (
     <section
       className="scroll-color-section"
       style={{ backgroundColor: bgColors[activeBlock] }}
     >
       <div className="scroll-color-container">
+
         {/* Block 1 */}
-        <div
-          className="color-block"
-          ref={(el) => { blockRefs.current[0] = el; }}
-        >
+        <div className="color-block" ref={(el) => { blockRefs.current[0] = el; }}>
           <div className="split-layout">
             <div className="split-text">
               <h2
@@ -206,7 +188,7 @@ Cordialement,`;
                   marginBottom: "16px",
                 }}
               >
-                Turn your studies into concrete professional experience.
+                Turn your studies into real professional experience.
               </p>
               <p
                 style={{
@@ -217,10 +199,10 @@ Cordialement,`;
                   lineHeight: 1.5,
                 }}
               >
-                Access internships throughout Algeria, apply quickly and develop
-                your career with leading companies and institutions.
+                Access internships across Algeria, apply quickly and grow your
+                career with leading companies and institutions.
               </p>
-              <button className="cta-primary">View offers</button>
+              <button className="cta-primary" onClick={() => navigate("/offers")}>View offers</button>
             </div>
             <div className="split-image">
               <img
@@ -228,8 +210,13 @@ Cordialement,`;
                 alt=""
                 style={{
                   width: "100%",
+                  maxWidth: "420px",
+                  maxHeight: "420px",
+                  objectFit: "cover",
                   borderRadius: "20px",
                   boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+                  display: "block",
+                  margin: "0 auto",
                 }}
               />
             </div>
@@ -237,10 +224,7 @@ Cordialement,`;
         </div>
 
         {/* Block 2 */}
-        <div
-          className="color-block"
-          ref={(el) => { blockRefs.current[1] = el; }}
-        >
+        <div className="color-block" ref={(el) => { blockRefs.current[1] = el; }}>
           <h2
             style={{
               fontFamily: "'Epilogue', sans-serif",
@@ -258,7 +242,7 @@ Cordialement,`;
                 <li>Recommended offers based on your profile</li>
                 <li>Direct messaging with recruiters</li>
                 <li>Real-time application tracking</li>
-                <li>CV builder & completion score</li>
+                <li>CV builder &amp; completion score</li>
               </ul>
             </div>
             <div className="side-phone">
@@ -268,10 +252,7 @@ Cordialement,`;
         </div>
 
         {/* Block 3 */}
-        <div
-          className="color-block"
-          ref={(el) => { blockRefs.current[2] = el; }}
-        >
+        <div className="color-block" ref={(el) => { blockRefs.current[2] = el; }}>
           <h2
             style={{
               fontFamily: "'Epilogue', sans-serif",
@@ -280,7 +261,7 @@ Cordialement,`;
               marginBottom: "16px",
             }}
           >
-            They succeeded with StageConnect
+            They succeeded with Stag.io
           </h2>
           <p style={{ fontSize: "17px", color: "#555", maxWidth: "600px" }}>
             Students who turned their internship into a career opportunity.
@@ -307,10 +288,7 @@ Cordialement,`;
         </div>
 
         {/* Block 4 */}
-        <div
-          className="color-block"
-          ref={(el) => { blockRefs.current[3] = el; }}
-        >
+        <div className="color-block" ref={(el) => { blockRefs.current[3] = el; }}>
           <h2
             style={{
               fontFamily: "'Epilogue', sans-serif",
@@ -323,7 +301,7 @@ Cordialement,`;
           </h2>
           <div className="side-layout" style={{ flexDirection: "row-reverse" }}>
             <div className="side-text">
-              <h3>Download our application</h3>
+              <h3>Download our app</h3>
               <p>All the features, directly on your mobile.</p>
               <div className="join-buttons">
                 <a href="#" className="store-btn">
@@ -351,10 +329,7 @@ Cordialement,`;
         </div>
 
         {/* Block 5 */}
-        <div
-          className="color-block"
-          ref={(el) => { blockRefs.current[4] = el; }}
-        >
+        <div className="color-block" ref={(el) => { blockRefs.current[4] = el; }}>
           <h2
             style={{
               fontFamily: "'Epilogue', sans-serif",
@@ -364,7 +339,7 @@ Cordialement,`;
               color: "#fff",
             }}
           >
-            Vous êtes une entreprise ou une administration ?
+            Are you a company or a university?
           </h2>
           <p
             style={{
@@ -375,7 +350,7 @@ Cordialement,`;
               maxWidth: "640px",
             }}
           >
-            Trouvez les talents qui feront grandir votre organisation.
+            Find the talent that will help your organisation grow.
           </p>
           <p
             style={{
@@ -385,10 +360,10 @@ Cordialement,`;
               marginBottom: "28px",
             }}
           >
-            Rejoignez la communauté Stag.io et accédez aux étudiants les plus
-            motivés de l'Université de Constantine. Publiez vos offres de stage,
-            gérez vos candidatures depuis un seul tableau de bord, et simplifiez
-            tout votre processus de recrutement — gratuitement.
+            Join the Stag.io community and connect with the most motivated
+            students from the University of Constantine. Post your internship
+            offers, manage applications from a single dashboard, and streamline
+            your entire recruitment process — for free.
           </p>
           <div
             className="cta-row"
@@ -399,19 +374,19 @@ Cordialement,`;
               flexWrap: "wrap",
             }}
           >
-            {/* FIX 2: button with onClick using window.location.href for mailto */}
-            <button className="cta-primary" onClick={handleJoinCommunity}>
-              Rejoindre la communauté
+            <button className="cta-primary" onClick={() => navigate("/login")}>
+              Join the community
             </button>
             <a
               href="/contact"
               className="cta-link"
               style={{ color: "#F5EFE6", textDecoration: "underline" }}
             >
-              Nous contacter
+              Contact us
             </a>
           </div>
         </div>
+
       </div>
     </section>
   );
@@ -422,21 +397,19 @@ export default function HomePage() {
   return (
     <>
       <SplitHero />
+
+      {/* Partners strip — swap PARTNERS array at the top of this file */}
       <div className="partners-strip">
-        <p>Ils recrutent via notre plateforme</p>
+        <p>They recruit through our platform</p>
         <div className="partners-logos">
-          {[
-            [IMG.disney, "Disney"],
-            [IMG.tiktok, "TikTok"],
-            [IMG.db, "Deutsche Bank"],
-            [IMG.pg, "P&G"],
-            [IMG.nike, "Nike"],
-            [IMG.ey, "EY"],
-          ].map(([src, alt]) => (
-            <img key={alt} src={src} alt={alt} />
+          {PARTNERS.map(([src, alt, href]) => (
+            <a key={alt} href={href} target="_blank" rel="noreferrer" className="partner-logo-link">
+              <img src={src} alt={alt} />
+            </a>
           ))}
         </div>
       </div>
+
       <ScrollColorSection />
     </>
   );

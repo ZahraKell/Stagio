@@ -4,9 +4,9 @@ import { Clock, Calendar } from "lucide-react";
 const ARTICLES = [
     {
         id: 1,
-        title: "Comment réussir son premier entretien en informatique",
-        category: "Conseils carrière",
-        excerpt: "Les entretiens techniques peuvent être stressants. Nous décryptons les patterns les plus courants et comment s'y préparer efficacement pour les entreprises algériennes.",
+        title: "How to ace your first IT job interview",
+        category: "Career advice",
+        excerpt: "Technical interviews can be stressful. We break down the most common patterns and how to prepare for them effectively for Algerian companies.",
         author: "Amine B.",
         initials: "AB",
         date: "12 Oct 2025",
@@ -15,9 +15,9 @@ const ARTICLES = [
     },
     {
         id: 2,
-        title: "Dans les coulisses de Yassir : la super-app d'Afrique",
-        category: "Focus entreprise",
-        excerpt: "Un regard exclusif sur la culture d'ingénierie et les opportunités de stage chez l'une des startups algériennes à la croissance la plus rapide.",
+        title: "Behind the scenes at Yassir: Africa's super-app",
+        category: "Company spotlight",
+        excerpt: "An exclusive look at the engineering culture and internship opportunities at one of Algeria's fastest-growing startups.",
         author: "Sarah M.",
         initials: "SM",
         date: "08 Oct 2025",
@@ -26,20 +26,20 @@ const ARTICLES = [
     },
     {
         id: 3,
-        title: "De stagiaire à développeur Full-Stack : le parcours de Karim",
-        category: "Témoignage",
-        excerpt: "Comment un stage de 3 mois chez Ooredoo s'est transformé en CDI, et ce que vous pouvez apprendre de son expérience.",
-        author: "Équipe éditoriale",
-        initials: "EE",
+        title: "From intern to Full-Stack developer: Karim's journey",
+        category: "Success story",
+        excerpt: "How a 3-month internship at Ooredoo turned into a permanent job, and what you can learn from his experience.",
+        author: "Editorial team",
+        initials: "ET",
         date: "05 Oct 2025",
         readTime: "4 min",
         bg: "linear-gradient(135deg, #2A4A2A, #4A7A4A)",
     },
     {
         id: 4,
-        title: "Top 5 des compétences tech émergentes sur le marché algérien",
-        category: "Marché",
-        excerpt: "Data Science, Cloud Computing et Cybersécurité connaissent une croissance massive. Voici ce que les employeurs recherchent cette année.",
+        title: "Top 5 emerging tech skills in the Algerian market",
+        category: "Market",
+        excerpt: "Data Science, Cloud Computing and Cybersecurity are growing massively. Here's what employers are looking for this year.",
         author: "Lyes R.",
         initials: "LR",
         date: "28 Sep 2025",
@@ -48,9 +48,9 @@ const ARTICLES = [
     },
     {
         id: 5,
-        title: "Construire le CV parfait pour les postes tech",
-        category: "Conseils carrière",
-        excerpt: "Votre CV est votre première impression. Apprenez à mettre en valeur vos projets universitaires et vos dépôts GitHub de manière efficace.",
+        title: "Building the perfect CV for tech roles",
+        category: "Career advice",
+        excerpt: "Your CV is your first impression. Learn how to showcase your university projects and GitHub repositories effectively.",
         author: "Amine B.",
         initials: "AB",
         date: "22 Sep 2025",
@@ -59,9 +59,9 @@ const ARTICLES = [
     },
     {
         id: 6,
-        title: "Naviguer dans les stages à distance : bonnes pratiques",
-        category: "Conseils carrière",
-        excerpt: "Avec de plus en plus d'entreprises proposant des postes hybrides et distants, apprendre à communiquer de manière asynchrone est plus important que jamais.",
+        title: "Navigating remote internships: best practices",
+        category: "Career advice",
+        excerpt: "With more and more companies offering hybrid and remote positions, learning to communicate asynchronously is more important than ever.",
         author: "Farid K.",
         initials: "FK",
         date: "15 Sep 2025",
@@ -70,12 +70,12 @@ const ARTICLES = [
     },
 ];
 
-const CATEGORIES = ["Tous", "Conseils carrière", "Focus entreprise", "Témoignage", "Marché"];
+const CATEGORIES = ["All", "Career advice", "Company spotlight", "Success story", "Market"];
 
 export default function BlogPage() {
-    const [active, setActive] = useState("Tous");
+    const [active, setActive] = useState("All");
 
-    const filtered = active === "Tous"
+    const filtered = active === "All"
         ? ARTICLES
         : ARTICLES.filter((a) => a.category === active);
 
@@ -84,9 +84,9 @@ export default function BlogPage() {
             <div className="page-dark-hero">
                 <div className="page-dark-hero-overlay" />
                 <div className="page-dark-hero-content">
-                    <span className="page-dark-hero-badge">Blog & Ressources</span>
-                    <h1>Conseils & Carrière</h1>
-                    <p>Découvrez des conseils pour décrocher votre stage, lisez des témoignages et restez informé sur le marché algérien de l'emploi.</p>
+                    <span className="page-dark-hero-badge">Blog & Resources</span>
+                    <h1>Advice & Career</h1>
+                    <p>Discover tips for landing your internship, read success stories and stay informed about the Algerian job market.</p>
                 </div>
             </div>
 
@@ -137,7 +137,7 @@ export default function BlogPage() {
 
                 <div className="blog-load-more">
                     <button className="cta-primary" style={{ background: "#2A1F14" }}>
-                        Charger plus d'articles
+                        Load more articles
                     </button>
                 </div>
             </div>
