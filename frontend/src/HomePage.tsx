@@ -10,6 +10,8 @@ import logo3 from "./assets/biofarm.png";
 import logo4 from "./assets/oredo.png";
 import logo5 from "./assets/sonatrach.png";
 import logo6 from "./assets/in.png";
+import commentsImg from "./assets/comments.png";
+import appmockImg from "./assets/appmock.png";
 
 const PARTNERS: [string, string, string][] = [
   [logo1, "Air Algérie", "https://www.airalgerie.dz"],
@@ -246,7 +248,7 @@ function ScrollColorSection() {
               </ul>
             </div>
             <div className="side-phone">
-              <img src="src/assets/comments.png" alt="App preview" />
+              <img src={commentsImg} alt="App preview" />
             </div>
           </div>
         </div>
@@ -322,7 +324,7 @@ function ScrollColorSection() {
             </div>
             <div className="side-phone">
               <div className="image-placeholder">
-                <img src="src/assets/appmock.png" alt="Mobile app mockup" />
+                <img src={appmockImg} alt="Mobile app mockup" />
               </div>
             </div>
           </div>

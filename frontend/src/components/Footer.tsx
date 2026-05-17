@@ -2,13 +2,14 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { HiMail, HiPhone, HiLocationMarker } from 'react-icons/hi';
 import { FaFacebook, FaTwitter, FaInstagram, FaLinkedin } from 'react-icons/fa';
+import logoBRemoved from "../assets/logo-b-removed.png";
 
 const Footer: React.FC = () => {
   return (
     <footer className="hs-footer">
       <div className="hs-footer-grid">
         <div className="hs-footer-brand">
-          <Link to="/" className="hs-footer-logo"><img src="/src/assets/logo-b-removed.png" alt="InternChips" style={{ height: "80px", objectFit: "contain" }} /></Link>
+          <Link to="/" className="hs-footer-logo"><img src={logoBRemoved} alt="InternChips" style={{ height: "80px", objectFit: "contain" }} /></Link>
           <p>Connecting students with top companies across Algeria. Your future starts here.</p>
           <div className="social-media">
             <a href="#" aria-label="Facebook" className="social-icon fb"><FaFacebook /></a>

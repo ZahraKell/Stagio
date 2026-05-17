@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { LogIn } from "lucide-react";
 import { getUserRole, clearTokens, getAccessToken } from "../auth";
+import logoRemoved from "../assets/logo-removed.png";
+import logoWRemoved from "../assets/logo-w-removed.png";
 
 type UserRole = "student" | "company" | "admin" | "administration" | null;
 
@@ -104,7 +106,7 @@ export default function Header() {
       <div className="hs-nav-left">
         <Link to="/" className="hs-logo">
             <img
-    src={isScrolled ? "/src/assets/logo-removed.png" : "/src/assets/logo-w-removed.png"}
+    src={isScrolled ? logoRemoved : logoWRemoved}
     alt="InternChips"
     style={{ height: isScrolled ? "55px" : "70px", objectFit: "contain", transition: "opacity 0.3s ease" }}
   /> 
