@@ -7,7 +7,7 @@ import {
     Users,
     Building2,
     CheckSquare,
-    BarChart3,
+    ClipboardList,
     Settings,
     HelpCircle,
     LogOut,
@@ -21,30 +21,25 @@ const navGroups = [
     {
         label: 'Overview',
         items: [
-            { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/admin', badge: null },
+            { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/administration', badge: null },
         ],
     },
     {
         label: 'Management',
         items: [
-            { id: 'offers', label: 'Internship Offers', icon: Briefcase, path: '/admin/offers', badge: '14' },
-            { id: 'applications', label: 'Applications', icon: FileText, path: '/admin/applications', badge: '7' },
-            { id: 'conventions', label: 'Conventions', icon: CheckSquare, path: '/admin/conventions', badge: '3' },
-            { id: 'students', label: 'Students', icon: Users, path: '/admin/students', badge: null },
-            { id: 'companies', label: 'Companies', icon: Building2, path: '/admin/companies', badge: '2' },
-        ],
-    },
-    {
-        label: 'Reports',
-        items: [
-            { id: 'stats', label: 'Statistics', icon: BarChart3, path: '/admin/stats', badge: null },
+            { id: 'offers', label: 'Internship Offers', icon: Briefcase, path: '/administration/offers', badge: null },
+            { id: 'applications', label: 'Applications', icon: FileText, path: '/administration/applications', badge: null },
+            { id: 'conventions', label: 'Conventions', icon: CheckSquare, path: '/administration/conventions', badge: null },
+            { id: 'reports', label: 'Rapports & Attestations', icon: ClipboardList, path: '/administration/reports', badge: null },
+            { id: 'students', label: 'Students', icon: Users, path: '/administration/students', badge: null },
+            { id: 'companies', label: 'Companies', icon: Building2, path: '/administration/companies', badge: null },
         ],
     },
     {
         label: 'System',
         items: [
-            { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings', badge: null },
-            { id: 'help', label: 'Help Center', icon: HelpCircle, path: '/admin/help', badge: null },
+            { id: 'settings', label: 'Settings', icon: Settings, path: '/administration/settings', badge: null },
+            { id: 'help', label: 'Help Center', icon: HelpCircle, path: '/administration/help', badge: null },
         ],
     },
 ];

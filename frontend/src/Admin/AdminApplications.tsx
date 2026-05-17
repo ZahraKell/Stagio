@@ -1,7 +1,7 @@
 // AdminApplications.tsx
 import { useState, useEffect } from "react";
-
-const API = "http://localhost:8000/api";
+import api from "../api";
+import toast from "react-hot-toast";
 
 interface Application {
   id: string | number;
@@ -29,35 +29,16 @@ export default function AdminApplications() {
   const fetchApplications = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/applications/admin/all/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.error) {
-        setApplications(data.data || []);
-      } else {
-        setApplications(getMockApplications());
-      }
+      const { data } = await api.get("applications/admin/all/");
+      const body = data as { error?: boolean; data?: Application[] };
+      setApplications(body.data ?? []);
     } catch {
-      setApplications(getMockApplications());
+      toast.error("Could not load applications.");
+      setApplications([]);
     } finally {
       setLoading(false);
     }
   };
-
-  const getMockApplications = (): Application[] => [
-    { id: "APP-042", student_name: "Mounir Samir", student_email: "mounir@esi.edu.dz", offer_title: "Mobile Dev Intern", offer_company: "Mobilis", offer_location: "Constantine", application_date: "20 Avr 2026", status: "pending" },
-    { id: "APP-041", student_name: "Rahmani Yasmine", student_email: "yasmine@usthb.dz", offer_title: "Cybersecurity Intern", offer_company: "Algérie Télécom", offer_location: "Sétif", application_date: "15 Avr 2026", status: "pending" },
-    { id: "APP-040", student_name: "Ahmed Benali", student_email: "ahmed@esi.edu.dz", offer_title: "Software Engineering Intern", offer_company: "Sonatrach", offer_location: "Constantine", application_date: "10 Avr 2026", status: "accepted" },
-    { id: "APP-039", student_name: "Sara Meziane", student_email: "sara@usthb.dz", offer_title: "Data Analyst", offer_company: "Mobilis", offer_location: "Alger", application_date: "08 Avr 2026", status: "accepted" },
-    { id: "APP-038", student_name: "Karim Lounis", student_email: "karim@ummto.edu.dz", offer_title: "Backend Dev Intern", offer_company: "Condor Electronics", offer_location: "Bordj Bou Arreridj", application_date: "05 Avr 2026", status: "reviewed" },
-    { id: "APP-037", student_name: "Nadia Hamdi", student_email: "nadia@univ-alger.dz", offer_title: "UI/UX Designer", offer_company: "Ooredoo", offer_location: "Alger", application_date: "01 Avr 2026", status: "refused" },
-    { id: "APP-036", student_name: "Youcef Ould", student_email: "youcef@esi.edu.dz", offer_title: "Network Engineer", offer_company: "Algérie Télécom", offer_location: "Sétif", application_date: "28 Mar 2026", status: "accepted" },
-    { id: "APP-035", student_name: "Amira Saadi", student_email: "amira@univ-oran.dz", offer_title: "Frontend Developer", offer_company: "Sonatrach", offer_location: "Oran", application_date: "25 Mar 2026", status: "pending" },
-    { id: "APP-034", student_name: "Kamel Djalil", student_email: "kamel@univ-bejaia.dz", offer_title: "Industrial Automation", offer_company: "Cevital", offer_location: "Béjaïa", application_date: "20 Mar 2026", status: "refused" },
-    { id: "APP-033", student_name: "Lyna Kerboua", student_email: "lyna@usthb.dz", offer_title: "Data Science Intern", offer_company: "Mobilis", offer_location: "Alger", application_date: "15 Mar 2026", status: "validated" },
-  ];
 
   const filtered = applications.filter(app => {
     const matchFilter = filter === "all" ? true : app.status === filter;

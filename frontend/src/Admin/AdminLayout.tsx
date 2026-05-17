@@ -1,8 +1,8 @@
 // AdminLayout.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
-
-const API = "http://localhost:8000/api";
+import api from "../api";
+import { logout as authLogout } from "../auth";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -20,31 +20,24 @@ export default function AdminLayout() {
 
   const fetchNotifCount = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/notifications/unread-count/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.error) setNotifCount(data.data?.unread_count || 0);
+      const { data } = await api.get("notifications/unread-count/");
+      const body = data as { error?: boolean; data?: { unread_count?: number } };
+      if (!body.error) setNotifCount(body.data?.unread_count ?? 0);
     } catch {
-      setNotifCount(3);
+      setNotifCount(0);
     }
   };
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/notifications/?is_read=false`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.error) setNotifications(data.data?.notifications?.slice(0, 5) || []);
+      const { data } = await api.get("notifications/", { params: { is_read: "false" } });
+      const body = data as {
+        error?: boolean;
+        data?: { notifications?: Array<{ id: number; message: string; created_at: string }> };
+      };
+      if (!body.error) setNotifications(body.data?.notifications?.slice(0, 5) || []);
     } catch {
-      setNotifications([
-        { id: 1, message: "New company registration: Condor Electronics", created_at: "5 min ago" },
-        { id: 2, message: "3 new internship applications pending review", created_at: "1 hour ago" },
-        { id: 3, message: "Convention CV-2026-078 validated", created_at: "Yesterday" },
-      ]);
+      setNotifications([]);
     }
   };
 
@@ -55,28 +48,17 @@ export default function AdminLayout() {
 
   const markAllRead = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      await fetch(`${API}/notifications/read-all/`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.patch("notifications/read-all/");
       setNotifCount(0);
       setNotifications([]);
-    } catch {}
+    } catch { /* ignore */ }
   };
 
   const handleLogout = async () => {
-    try {
-      const token = localStorage.getItem("access_token");
-      const refresh = localStorage.getItem("refresh_token");
-      await fetch(`${API}/auth/logout/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ refresh }),
-      });
-    } catch {}
-    localStorage.clear();
-    navigate("/auth");
+    await authLogout();
+    localStorage.removeItem("user_data");
+    localStorage.removeItem("full_name");
+    navigate("/login");
   };
 
   const menuItems = [
@@ -102,9 +84,9 @@ export default function AdminLayout() {
       {/* Sidebar */}
       <aside className="am-sidebar">
         <div className="am-brand" onClick={() => navigate("/admin/dashboard")}>
-          <div className="am-brand-logo">SC</div>
+          <div className="am-brand-logo">IC</div>
           <div>
-            <div className="am-brand-title">StageConnect</div>
+            <div className="am-brand-title">InternChips</div>
             <div className="am-brand-sub">Admin Portal</div>
           </div>
         </div>

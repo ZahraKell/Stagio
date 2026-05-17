@@ -1,8 +1,8 @@
 // AdminDashboard.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API = "http://localhost:8000/api";
+import api from "../api";
+import toast from "react-hot-toast";
 
 interface DashStats {
   total_users: number;
@@ -13,6 +13,8 @@ interface DashStats {
   total_offers: number;
   pending_companies: number;
   pending_applications: number;
+  accepted_applications: number;
+  refused_applications: number;
   active_offers: number;
 }
 
@@ -22,7 +24,9 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DashStats>({
     total_users: 0, total_students: 0, total_companies: 0,
     total_applications: 0, total_conventions: 0, total_offers: 0,
-    pending_companies: 0, pending_applications: 0, active_offers: 0,
+    pending_companies: 0, pending_applications: 0,
+    accepted_applications: 0, refused_applications: 0,
+    active_offers: 0,
   });
   const [recentApplications, setRecentApplications] = useState<any[]>([]);
   const [pendingCompanies, setPendingCompanies] = useState<any[]>([]);
@@ -32,87 +36,86 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchDashboardData = async () => {
-    const token = localStorage.getItem("access_token");
-    const headers = { Authorization: `Bearer ${token}` };
-
     try {
       const [usersRes, appsRes, companiesRes, offersRes] = await Promise.allSettled([
-        fetch(`${API}/admin/users/`, { headers }).then(r => r.json()),
-        fetch(`${API}/applications/admin/all/`, { headers }).then(r => r.json()),
-        fetch(`${API}/admin/companies/pending/`, { headers }).then(r => r.json()),
-        fetch(`${API}/offers/`, { headers }).then(r => r.json()),
+        api.get("admin/users/"),
+        api.get("applications/admin/all/"),
+        api.get("admin/companies/pending/"),
+        api.get("admin/offers/"),
       ]);
 
-      const users = usersRes.status === "fulfilled" ? (usersRes.value.data || []) : getMockUsers();
-      const apps = appsRes.status === "fulfilled" ? (appsRes.value.data || []) : getMockApps();
-      const pendingComps = companiesRes.status === "fulfilled" ? (companiesRes.value.data || []) : getMockPendingComps();
-      const offers = offersRes.status === "fulfilled" ? (Array.isArray(offersRes.value) ? offersRes.value : []) : [];
+      type UserRow = { role?: string };
+      type AppRow = { status?: string; id?: number; student_name?: string; offer_title?: string; offer_company_name?: string; company_name?: string; application_date?: string };
+      type OfferRow = { status?: string };
+
+      const users: UserRow[] =
+        usersRes.status === "fulfilled"
+          ? ((usersRes.value.data as { data?: UserRow[] })?.data ?? [])
+          : [];
+      const apps: AppRow[] =
+        appsRes.status === "fulfilled"
+          ? ((appsRes.value.data as { data?: AppRow[] })?.data ?? [])
+          : [];
+      const pendingComps: unknown[] =
+        companiesRes.status === "fulfilled"
+          ? ((companiesRes.value.data as { data?: unknown[] })?.data ?? [])
+          : [];
+      const offersBody = offersRes.status === "fulfilled" ? offersRes.value.data : null;
+      const offers: OfferRow[] = Array.isArray(offersBody) ? (offersBody as OfferRow[]) : [];
+      if (offersRes.status === "rejected") {
+        toast.error("Could not load offers list.");
+      }
+
+      if (
+        usersRes.status === "rejected" ||
+        appsRes.status === "rejected" ||
+        companiesRes.status === "rejected"
+      ) {
+        toast.error("Some dashboard data could not be loaded. Check admin permissions.");
+      }
 
       setStats({
         total_users: users.length,
-        total_students: users.filter((u: any) => u.role === "student").length,
-        total_companies: users.filter((u: any) => u.role === "company").length,
+        total_students: users.filter((u) => u.role === "student").length,
+        total_companies: users.filter((u) => u.role === "company").length,
         total_applications: apps.length,
         total_conventions: 0,
         total_offers: offers.length,
         pending_companies: pendingComps.length,
-        pending_applications: apps.filter((a: any) => a.status === "pending").length,
-        active_offers: offers.filter((o: any) => o.status === "open").length,
+        pending_applications: apps.filter((a) => a.status === "pending").length,
+        accepted_applications: apps.filter((a) => a.status === "accepted").length,
+        refused_applications: apps.filter((a) => a.status === "refused").length,
+        active_offers: offers.filter((o) => o.status === "open").length,
       });
       setRecentApplications(apps.slice(0, 5));
       setPendingCompanies(pendingComps.slice(0, 3));
     } catch {
-      setStats({ total_users: 45, total_students: 28, total_companies: 12, total_applications: 67, total_conventions: 23, total_offers: 14, pending_companies: 5, pending_applications: 15, active_offers: 9 });
-      setRecentApplications(getMockApps().slice(0, 5));
-      setPendingCompanies(getMockPendingComps());
+      toast.error("Dashboard load failed.");
+      setRecentApplications([]);
+      setPendingCompanies([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const getMockUsers = () => [
-    ...Array(28).fill({ role: "student" }),
-    ...Array(12).fill({ role: "company" }),
-    ...Array(5).fill({ role: "admin" }),
-  ];
-  const getMockApps = () => [
-    { id: "APP-042", student_name: "Ahmed Benali", offer_title: "Software Engineering Intern", offer_company: "Sonatrach", application_date: "28 Apr", status: "pending" },
-    { id: "APP-041", student_name: "Sara Meziane", offer_title: "Data Analyst", offer_company: "Mobilis", application_date: "27 Apr", status: "accepted" },
-    { id: "APP-040", student_name: "Karim Lounis", offer_title: "Backend Dev", offer_company: "Condor", application_date: "26 Apr", status: "reviewed" },
-    { id: "APP-039", student_name: "Nadia Hamdi", offer_title: "UI/UX Designer", offer_company: "Ooredoo", application_date: "25 Apr", status: "refused" },
-    { id: "APP-038", student_name: "Youcef Ould", offer_title: "Network Engineer", offer_company: "Algérie Télécom", application_date: "24 Apr", status: "pending" },
-  ];
-  const getMockPendingComps = () => [
-    { id: 1, company_name: "Condor Electronics", company_sector: "Électronique", town: "Bordj Bou Arreridj", submitted_at: "2026-04-26" },
-    { id: 2, company_name: "Cevital Group", company_sector: "Agroalimentaire", town: "Béjaïa", submitted_at: "2026-04-25" },
-    { id: 3, company_name: "Ooredoo Algeria", company_sector: "Télécommunications", town: "Alger", submitted_at: "2026-04-24" },
-  ];
-
   const handleApproveCompany = async (id: number) => {
     try {
-      const token = localStorage.getItem("access_token");
-      await fetch(`${API}/admin/companies/${id}/approve/`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setPendingCompanies(prev => prev.filter(c => c.id !== id));
-      setStats(prev => ({ ...prev, pending_companies: prev.pending_companies - 1 }));
+      await api.post(`admin/companies/${id}/approve/`, {});
+      setPendingCompanies((prev) => prev.filter((c) => (c as { id: number }).id !== id));
+      setStats((prev) => ({ ...prev, pending_companies: Math.max(0, prev.pending_companies - 1) }));
+      toast.success("Company approved.");
     } catch {
-      setPendingCompanies(prev => prev.filter(c => c.id !== id));
+      toast.error("Approve failed.");
     }
   };
 
   const handleRejectCompany = async (id: number) => {
     try {
-      const token = localStorage.getItem("access_token");
-      await fetch(`${API}/admin/companies/${id}/reject/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ reason: "Does not meet requirements" }),
-      });
-      setPendingCompanies(prev => prev.filter(c => c.id !== id));
+      await api.post(`admin/companies/${id}/reject/`, { reason: "Does not meet requirements" });
+      setPendingCompanies((prev) => prev.filter((c) => (c as { id: number }).id !== id));
+      toast.success("Company rejected.");
     } catch {
-      setPendingCompanies(prev => prev.filter(c => c.id !== id));
+      toast.error("Reject failed.");
     }
   };
 
@@ -194,7 +197,7 @@ export default function AdminDashboard() {
                   <tr key={app.id || i}>
                     <td><strong>{app.student_name}</strong></td>
                     <td className="am-dash-offer-cell">{app.offer_title}</td>
-                    <td>{app.offer_company || app.company_name}</td>
+                    <td>{app.offer_company_name || (app as { offer_company?: string }).offer_company || (app as { company_name?: string }).company_name}</td>
                     <td className="am-dash-date-cell">{app.application_date || app.date}</td>
                     <td>
                       <span className={`am-dash-badge ${statusBadge(app.status)}`}>
@@ -247,9 +250,9 @@ export default function AdminDashboard() {
             <div className="am-dash-card-body">
               <div className="am-dash-distro">
                 {[
-                  { label: "Pending", count: stats.pending_applications, color: "#f59e0b", pct: stats.total_applications ? Math.round(stats.pending_applications / stats.total_applications * 100) : 0 },
-                  { label: "Accepted", count: Math.round(stats.total_applications * 0.34), color: "#22c55e", pct: 34 },
-                  { label: "Refused", count: Math.round(stats.total_applications * 0.15), color: "#ef4444", pct: 15 },
+                  { label: "Pending", count: stats.pending_applications, color: "#f59e0b", pct: stats.total_applications ? Math.round((stats.pending_applications / stats.total_applications) * 100) : 0 },
+                  { label: "Accepted", count: stats.accepted_applications, color: "#22c55e", pct: stats.total_applications ? Math.round((stats.accepted_applications / stats.total_applications) * 100) : 0 },
+                  { label: "Refused", count: stats.refused_applications, color: "#ef4444", pct: stats.total_applications ? Math.round((stats.refused_applications / stats.total_applications) * 100) : 0 },
                 ].map(item => (
                   <div key={item.label} className="am-dash-distro-item">
                     <div className="am-dash-distro-bar">

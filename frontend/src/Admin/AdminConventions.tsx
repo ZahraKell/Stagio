@@ -1,7 +1,7 @@
 // AdminConventions.tsx
 import { useState, useEffect } from "react";
-
-const API = "http://localhost:8000/api";
+import api from "../api";
+import toast from "react-hot-toast";
 
 interface Convention {
   id: number;
@@ -36,58 +36,43 @@ export default function AdminConventions() {
   const fetchConventions = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/conventions/pending-admin/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.error) {
-        setConventions(data.data || getMockConventions());
+      const { data } = await api.get("conventions/pending-admin/");
+      const body = data as { error?: boolean; data?: Convention[] };
+      if (!body.error && Array.isArray(body.data)) {
+        setConventions(
+          body.data.map((c) => ({
+            ...c,
+            start_date: c.start_date ?? null,
+            end_date: c.end_date ?? null,
+            admin_signed_at: c.admin_signed_at ?? null,
+          })),
+        );
       } else {
-        setConventions(getMockConventions());
+        setConventions([]);
+        toast.error("Could not load conventions.");
       }
     } catch {
-      setConventions(getMockConventions());
+      setConventions([]);
+      toast.error("Could not load conventions.");
     } finally {
       setLoading(false);
     }
   };
 
-  const getMockConventions = (): Convention[] => [
-    { id: 81, status: "VALIDATED", student_name: "Benali Ahmed", student_email: "ahmed@esi.edu.dz", company_name: "Condor Electronics", offer_title: "Backend Developer Intern", offer_town: "Constantine", start_date: "2026-06-01", end_date: "2026-07-31", student_signed_at: "2026-05-01T10:00:00Z", company_signed_at: "2026-05-02T14:00:00Z", admin_signed_at: "2026-05-03T09:00:00Z", created_at: "2026-05-01T09:00:00Z", updated_at: "2026-05-03T09:00:00Z" },
-    { id: 79, status: "PENDING_ADMIN", student_name: "Mounir Samir", student_email: "mounir@esi.edu.dz", company_name: "Mobilis", offer_title: "Mobile Dev Intern", offer_town: "Alger", start_date: "2026-06-01", end_date: "2026-08-31", student_signed_at: "2026-04-28T10:00:00Z", company_signed_at: "2026-04-30T14:00:00Z", admin_signed_at: null, created_at: "2026-04-28T09:00:00Z", updated_at: "2026-04-30T14:00:00Z" },
-    { id: 78, status: "PENDING_ADMIN", student_name: "Rahmani Yasmine", student_email: "yasmine@usthb.dz", company_name: "Algérie Télécom", offer_title: "Cybersecurity Intern", offer_town: "Sétif", start_date: "2026-05-15", end_date: "2026-08-15", student_signed_at: "2026-04-25T10:00:00Z", company_signed_at: "2026-04-27T14:00:00Z", admin_signed_at: null, created_at: "2026-04-25T09:00:00Z", updated_at: "2026-04-27T14:00:00Z" },
-    { id: 77, status: "PENDING_COMPANY", student_name: "Amira Saadi", student_email: "amira@univ-oran.dz", company_name: "Sonatrach", offer_title: "Frontend Developer", offer_town: "Oran", start_date: "2026-05-01", end_date: "2026-07-31", student_signed_at: "2026-04-20T10:00:00Z", company_signed_at: null, admin_signed_at: null, created_at: "2026-04-20T09:00:00Z", updated_at: "2026-04-20T10:00:00Z" },
-    { id: 76, status: "PENDING_STUDENT", student_name: "Lyna Kerboua", student_email: "lyna@usthb.dz", company_name: "Mobilis", offer_title: "Data Science Intern", offer_town: "Alger", start_date: null, end_date: null, student_signed_at: null, company_signed_at: null, admin_signed_at: null, created_at: "2026-04-19T09:00:00Z", updated_at: "2026-04-19T09:00:00Z" },
-  ];
-
   const handleValidate = async (conv: Convention) => {
     setSigning(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/conventions/${conv.id}/sign/`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.error) {
-        setConventions(prev => prev.map(c =>
-          c.id === conv.id ? { ...c, status: "VALIDATED", admin_signed_at: new Date().toISOString() } : c
-        ));
-        if (selectedConv?.id === conv.id) {
-          setSelectedConv({ ...conv, status: "VALIDATED", admin_signed_at: new Date().toISOString() });
-        }
-        setSuccessMsg("Convention validated successfully!");
-        setTimeout(() => setSuccessMsg(""), 3000);
-      } else {
-        setSuccessMsg("Convention marked as validated locally.");
-        setConventions(prev => prev.map(c => c.id === conv.id ? { ...c, status: "VALIDATED" } : c));
-        setTimeout(() => setSuccessMsg(""), 3000);
+      await api.post(`conventions/${conv.id}/sign/`, {});
+      setConventions((prev) => prev.filter((c) => c.id !== conv.id));
+      if (selectedConv?.id === conv.id) {
+        setSelectedConv(null);
+        setShowDetail(false);
       }
-    } catch {
-      setConventions(prev => prev.map(c => c.id === conv.id ? { ...c, status: "VALIDATED" } : c));
-      setSuccessMsg("Convention validated.");
+      setSuccessMsg("Convention validated successfully!");
+      toast.success("Validated.");
       setTimeout(() => setSuccessMsg(""), 3000);
+    } catch {
+      toast.error("Validation failed.");
     } finally {
       setSigning(false);
     }
@@ -133,7 +118,7 @@ export default function AdminConventions() {
         </div>
         {pendingAdminCount > 0 && (
           <div style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: 8, padding: ".5rem 1rem", fontSize: ".78rem", fontWeight: 700, color: "#92400e" }}>
-            ⚠️ {pendingAdminCount} convention{pendingAdminCount > 1 ? "s" : ""} awaiting your signature
+            ⚠ï¸ {pendingAdminCount} convention{pendingAdminCount > 1 ? "s" : ""} awaiting your signature
           </div>
         )}
       </div>

@@ -1,599 +1,512 @@
-import React, { useState, useMemo } from 'react';
-import DashboardLayout from '../components/DashboardLayout';
+import React, { useEffect, useState } from "react";
+import DashboardLayout from "../components/DashboardLayout";
 import {
-    Search, X, ChevronRight, Filter,
-    CheckCircle, Clock, XCircle, Eye,
-    GraduationCap, Building2, Briefcase,
-    CalendarDays, MapPin, Tag, FileText,
-    AlertCircle, TrendingUp, Users, Mail,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+  CheckCircle, XCircle, RefreshCw, X, AlertTriangle,
+  ArrowRight, FileText, Clock, CheckSquare, XSquare,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import api from "../api";
+import toast from "react-hot-toast";
 
-/* ══════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════
    TYPES
-   ══════════════════════════════════════════════════════════════ */
-
-type AppStatus = 'pending' | 'under_review' | 'accepted' | 'rejected';
-
-interface Application {
-    id: string;
-    // Student info
-    studentName: string;
-    studentLevel: string;
-    studentSpecialty: string;
-    studentEmail: string;
-    studentWilaya: string;
-    // Offer info
-    company: string;
-    companyInitial: string;
-    companyWilaya: string;
-    role: string;
-    domain: string;
-    offerDuration: string;
-    offerStart: string;
-    // Application info
-    status: AppStatus;
-    submittedAt: string;
-    updatedAt: string;
-    coverNote: string;
-    cvUploaded: boolean;
+   ══════════════════════════════════════════════════════════ */
+interface AppRow {
+  id: number;
+  offer_title: string;
+  offer_location?: string;
+  offer_company_name?: string;
+  student_name: string;
+  student_email: string;
+  status: string;
+  application_date: string;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   MOCK DATA
-   ══════════════════════════════════════════════════════════════ */
+function unwrapApps(res: { data: unknown }): AppRow[] {
+  const body = res.data as { data?: AppRow[] };
+  return body?.data ?? [];
+}
 
-const MOCK_APPLICATIONS: Application[] = [
-    {
-        id: 'APP-2026-041',
-        studentName: 'Mounir Samir', studentLevel: 'L3', studentSpecialty: 'Informatique',
-        studentEmail: 's.mounir@ufmc1.dz', studentWilaya: 'Constantine',
-        company: 'Mobilis', companyInitial: 'M', companyWilaya: 'Constantine',
-        role: 'Mobile Dev Intern', domain: 'Informatique',
-        offerDuration: '3 mois', offerStart: 'Juin 2026',
-        status: 'pending', submittedAt: '20 Avr 2026', updatedAt: '20 Avr 2026',
-        coverNote: 'Je suis très motivé par cette offre car je développe des applications Flutter depuis 2 ans. J\'ai réalisé deux projets personnels disponibles sur GitHub.',
-        cvUploaded: true,
-    },
-    {
-        id: 'APP-2026-040',
-        studentName: 'Rahmani Yasmine', studentLevel: 'M2', studentSpecialty: 'Sécurité',
-        studentEmail: 'y.rahmani@ufmc1.dz', studentWilaya: 'Sétif',
-        company: 'Algérie Télécom', companyInitial: 'A', companyWilaya: 'Sétif',
-        role: 'Cybersecurity Intern', domain: 'Sécurité',
-        offerDuration: '3 mois', offerStart: 'Juil 2026',
-        status: 'accepted', submittedAt: '15 Avr 2026', updatedAt: '18 Avr 2026',
-        coverNote: 'Mon mémoire de M2 porte sur la détection d\'intrusions avec des méthodes de machine learning. Je maîtrise les outils SIEM et les protocoles de sécurité réseau.',
-        cvUploaded: true,
-    },
-    {
-        id: 'APP-2026-039',
-        studentName: 'Hadj Ali Rania', studentLevel: 'M1', studentSpecialty: 'Informatique',
-        studentEmail: 'r.hadjali@ufmc1.dz', studentWilaya: 'Alger',
-        company: 'Ooredoo Algeria', companyInitial: 'O', companyWilaya: 'Alger',
-        role: 'Software Engineering Intern', domain: 'Informatique',
-        offerDuration: '3 mois', offerStart: 'Mai 2026',
-        status: 'under_review', submittedAt: '27 Avr 2026', updatedAt: '28 Avr 2026',
-        coverNote: 'Passionnée par le développement fullstack, j\'ai travaillé sur plusieurs projets Django et React dans le cadre de mes cours. Je cherche à consolider mes compétences en environnement professionnel.',
-        cvUploaded: true,
-    },
-    {
-        id: 'APP-2026-038',
-        studentName: 'Tebbal Omar', studentLevel: 'L3', studentSpecialty: 'Électronique',
-        studentEmail: 'o.tebbal@ufmc1.dz', studentWilaya: 'Béjaïa',
-        company: 'Cevital Group', companyInitial: 'C', companyWilaya: 'Béjaïa',
-        role: 'Industrial Automation Intern', domain: 'Électronique',
-        offerDuration: '2 mois', offerStart: 'Juin 2026',
-        status: 'pending', submittedAt: '23 Avr 2026', updatedAt: '23 Avr 2026',
-        coverNote: 'Je maîtrise la programmation des automates Siemens S7 et j\'ai suivi une formation en SCADA durant ma troisième année.',
-        cvUploaded: false,
-    },
-    {
-        id: 'APP-2026-037',
-        studentName: 'Benali Ahmed', studentLevel: 'L3', studentSpecialty: 'Informatique',
-        studentEmail: 'a.benali@ufmc1.dz', studentWilaya: 'Constantine',
-        company: 'Mobilis', companyInitial: 'M', companyWilaya: 'Constantine',
-        role: 'Mobile Dev Intern', domain: 'Informatique',
-        offerDuration: '3 mois', offerStart: 'Juin 2026',
-        status: 'rejected', submittedAt: '05 Avr 2026', updatedAt: '10 Avr 2026',
-        coverNote: 'Étudiant en L3 Informatique, je souhaite acquérir une expérience pratique en développement mobile.',
-        cvUploaded: true,
-    },
-    {
-        id: 'APP-2026-036',
-        studentName: 'Zeroual Imane', studentLevel: 'M1', studentSpecialty: 'Automatique',
-        studentEmail: 'i.zeroual@ufmc1.dz', studentWilaya: 'Annaba',
-        company: 'Sonatrach', companyInitial: 'S', companyWilaya: 'Hassi Messaoud',
-        role: 'Control Systems Intern', domain: 'Automatique',
-        offerDuration: '3 mois', offerStart: 'Juin 2026',
-        status: 'accepted', submittedAt: '08 Avr 2026', updatedAt: '12 Avr 2026',
-        coverNote: 'Spécialisée en systèmes de contrôle industriel, j\'ai réalisé mon projet de fin d\'année sur la régulation PID appliquée aux systèmes hydrauliques.',
-        cvUploaded: true,
-    },
-    {
-        id: 'APP-2026-035',
-        studentName: 'Mounir Samir', studentLevel: 'L3', studentSpecialty: 'Informatique',
-        studentEmail: 's.mounir@ufmc1.dz', studentWilaya: 'Constantine',
-        company: 'Ooredoo Algeria', companyInitial: 'O', companyWilaya: 'Alger',
-        role: 'IT Support Intern', domain: 'Informatique',
-        offerDuration: '2 mois', offerStart: 'Juin 2026',
-        status: 'rejected', submittedAt: '12 Avr 2026', updatedAt: '16 Avr 2026',
-        coverNote: 'Je souhaite découvrir l\'environnement IT d\'un opérateur télécom majeur et développer mes compétences en support et infrastructure.',
-        cvUploaded: true,
-    },
-    {
-        id: 'APP-2026-034',
-        studentName: 'Mansouri Sara', studentLevel: 'M2', studentSpecialty: 'Informatique',
-        studentEmail: 's.mansouri@ufmc1.dz', studentWilaya: 'Constantine',
-        company: 'Cevital Group', companyInitial: 'C', companyWilaya: 'Béjaïa',
-        role: 'Data Engineer Intern', domain: 'Informatique',
-        offerDuration: '3 mois', offerStart: 'Mar 2026',
-        status: 'accepted', submittedAt: '02 Mar 2026', updatedAt: '05 Mar 2026',
-        coverNote: 'Mon mémoire de master porte sur les pipelines de données temps réel avec Apache Kafka. Je maîtrise Python, SQL et les outils BI.',
-        cvUploaded: true,
-    },
-    {
-        id: 'APP-2026-033',
-        studentName: 'Hadj Ali Rania', studentLevel: 'M1', studentSpecialty: 'Informatique',
-        studentEmail: 'r.hadjali@ufmc1.dz', studentWilaya: 'Alger',
-        company: 'Air Algérie', companyInitial: 'A', companyWilaya: 'Alger',
-        role: 'IT Systems Intern', domain: 'Informatique',
-        offerDuration: '3 mois', offerStart: 'Juin 2026',
-        status: 'pending', submittedAt: '22 Avr 2026', updatedAt: '22 Avr 2026',
-        coverNote: 'Je m\'intéresse aux systèmes d\'information critiques et à leur administration. L\'environnement d\'Air Algérie représente pour moi une opportunité unique.',
-        cvUploaded: true,
-    },
-    {
-        id: 'APP-2026-032',
-        studentName: 'Kerboua Lyna', studentLevel: 'M1', studentSpecialty: 'Réseaux',
-        studentEmail: 'l.kerboua@ufmc1.dz', studentWilaya: 'Sétif',
-        company: 'Sonatrach', companyInitial: 'S', companyWilaya: 'Hassi Messaoud',
-        role: 'Network Engineering Intern', domain: 'Télécom',
-        offerDuration: '3 mois', offerStart: 'Mai 2026',
-        status: 'accepted', submittedAt: '01 Avr 2026', updatedAt: '04 Avr 2026',
-        coverNote: 'Certifiée CCNA, je cherche à approfondir mes compétences sur les infrastructures réseau industrielles et les protocoles utilisés dans les environnements pétroliers.',
-        cvUploaded: true,
-    },
-];
+/* ══════════════════════════════════════════════════════════
+   REJECT MODAL
+   ══════════════════════════════════════════════════════════ */
+function RejectModal({
+  app,
+  onClose,
+  onRejected,
+}: {
+  app: AppRow;
+  onClose: () => void;
+  onRejected: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
 
-/* ══════════════════════════════════════════════════════════════
-   CONFIG
-   ══════════════════════════════════════════════════════════════ */
+  const handleReject = async () => {
+    if (!reason.trim()) {
+      toast.error("Please provide a reason for rejection.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.put(`applications/${app.id}/reject/`, { reason });
+      setDone(true);
+      setTimeout(() => { onRejected(); }, 1600);
+    } catch {
+      toast.error("Rejection failed. Check application status and permissions.");
+      setSubmitting(false);
+    }
+  };
 
-const STATUS_CONFIG: Record<AppStatus, {
-    label: string; cls: string; icon: React.ElementType; dotCls: string;
-}> = {
-    pending: { label: 'Pending', cls: 'as-pending', icon: Clock, dotCls: 'dot-amber' },
-    under_review: { label: 'Under Review', cls: 'as-review', icon: Eye, dotCls: 'dot-blue' },
-    accepted: { label: 'Accepted', cls: 'as-accepted', icon: CheckCircle, dotCls: 'dot-green' },
-    rejected: { label: 'Rejected', cls: 'as-rejected', icon: XCircle, dotCls: 'dot-red' },
+  return (
+    <div
+      className="conv-overlay"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="conv-popup" style={{ maxWidth: 480 }}>
+        <div className="conv-head">
+          <div className="conv-head-icon" style={{ background: "#fee2e2", color: "#dc2626" }}>
+            <XCircle size={22} />
+          </div>
+          <div>
+            <h3>Reject Internship Convention</h3>
+            <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>Application #{app.id}</p>
+          </div>
+          {!done && (
+            <button className="conv-close" onClick={onClose}><X size={16} /></button>
+          )}
+        </div>
+
+        {done ? (
+          <div className="conv-success">
+            <div className="conv-success-icon" style={{ fontSize: 36 }}>❌</div>
+            <h3>Convention Rejected</h3>
+            <p>The student and company have been notified with the reason provided.</p>
+          </div>
+        ) : (
+          <>
+            <div className="conv-body">
+              <div className="conv-summary">
+                <div className="conv-summary-item">
+                  <span>Student</span><strong>{app.student_name}</strong>
+                </div>
+                <div className="conv-summary-item">
+                  <span>Email</span><strong style={{ fontSize: 12 }}>{app.student_email}</strong>
+                </div>
+                <div className="conv-summary-item">
+                  <span>Offer</span><strong>{app.offer_title}</strong>
+                </div>
+                <div className="conv-summary-item">
+                  <span>Company</span><strong>{app.offer_company_name || "—"}</strong>
+                </div>
+              </div>
+
+              <div className="conv-explainer" style={{
+                background: "#fff7ed", border: "1px solid #fed7aa",
+                borderRadius: 10, padding: "12px 14px",
+                display: "flex", gap: 10, alignItems: "flex-start", margin: "12px 0",
+              }}>
+                <AlertTriangle size={16} style={{ color: "#ea580c", flexShrink: 0, marginTop: 2 }} />
+                <p style={{ margin: 0, fontSize: 13, color: "#7c2d12", lineHeight: 1.5 }}>
+                  Rejecting will notify both the student and the company.
+                  The application status will revert to <strong>pending</strong>.
+                  Please provide a clear reason so the student can improve their profile.
+                </p>
+              </div>
+
+              <div style={{ marginTop: 4 }}>
+                <label style={{
+                  display: "block", fontSize: 13, fontWeight: 600,
+                  color: "#374151", marginBottom: 6,
+                }}>
+                  Reason for rejection <span style={{ color: "#ef4444" }}>*</span>
+                </label>
+                <textarea
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  placeholder="e.g. The student's CV is incomplete. Please add more skills and experience before reapplying."
+                  rows={4}
+                  style={{
+                    width: "100%", padding: "10px 12px", borderRadius: 8,
+                    border: reason.trim() ? "1px solid #d1d5db" : "1px solid #fca5a5",
+                    fontSize: 13, lineHeight: 1.6, resize: "vertical",
+                    outline: "none", fontFamily: "inherit", boxSizing: "border-box",
+                  }}
+                />
+                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
+                  {reason.length} characters — minimum 10 recommended
+                </div>
+              </div>
+            </div>
+
+            <div className="conv-footer">
+              <button className="conv-btn-cancel" onClick={onClose}>Cancel</button>
+              <button
+                style={{
+                  padding: "10px 20px", borderRadius: 8, border: "none",
+                  fontWeight: 600, fontSize: 14,
+                  cursor: reason.trim() && !submitting ? "pointer" : "not-allowed",
+                  background: reason.trim() ? "#dc2626" : "#fca5a5",
+                  color: "#fff", display: "flex", alignItems: "center", gap: 6,
+                  transition: "background 0.15s",
+                }}
+                disabled={!reason.trim() || submitting}
+                onClick={() => void handleReject()}
+              >
+                <XCircle size={15} />
+                {submitting ? "Rejecting…" : "Confirm Rejection"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   VALIDATE MODAL
+   ══════════════════════════════════════════════════════════ */
+function ValidateModal({
+  app,
+  onClose,
+  onValidated,
+}: {
+  app: AppRow;
+  onClose: () => void;
+  onValidated: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleValidate = async () => {
+    setSubmitting(true);
+    try {
+      await api.put(`applications/${app.id}/validate/`, {});
+      setDone(true);
+      setTimeout(onValidated, 1600);
+    } catch {
+      toast.error("Validation failed. Check application status and permissions.");
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="conv-overlay"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="conv-popup" style={{ maxWidth: 440 }}>
+        <div className="conv-head">
+          <div className="conv-head-icon" style={{ background: "#dcfce7", color: "#16a34a" }}>
+            <CheckCircle size={22} />
+          </div>
+          <div>
+            <h3>Validate Internship</h3>
+            <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>Application #{app.id}</p>
+          </div>
+          {!done && (
+            <button className="conv-close" onClick={onClose}><X size={16} /></button>
+          )}
+        </div>
+
+        {done ? (
+          <div className="conv-success">
+            <div className="conv-success-icon">✅</div>
+            <h3>Internship Validated!</h3>
+            <p>
+              The student and company have been notified. The convention PDF
+              will be sent automatically by email.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="conv-body">
+              <div className="conv-summary">
+                <div className="conv-summary-item">
+                  <span>Student</span><strong>{app.student_name}</strong>
+                </div>
+                <div className="conv-summary-item">
+                  <span>Offer</span><strong>{app.offer_title}</strong>
+                </div>
+                <div className="conv-summary-item">
+                  <span>Company</span><strong>{app.offer_company_name || "—"}</strong>
+                </div>
+              </div>
+
+              <div className="conv-explainer" style={{
+                background: "#f0fdf4", border: "1px solid #bbf7d0",
+                borderRadius: 10, padding: "12px 14px",
+                display: "flex", gap: 10, marginTop: 12,
+              }}>
+                <CheckCircle size={16} style={{ color: "#16a34a", flexShrink: 0, marginTop: 2 }} />
+                <p style={{ margin: 0, fontSize: 13, color: "#14532d", lineHeight: 1.5 }}>
+                  Validating will mark the internship as <strong>validated</strong>,
+                  auto-add it to the student's CV, send confirmation emails, and
+                  generate the final convention PDF.
+                </p>
+              </div>
+
+              <div className="conv-chain" style={{ marginTop: 16 }}>
+                <div className="conv-chain-step conv-chain-done">
+                  <span className="conv-chain-dot">✓</span>
+                  <span>Student signed</span>
+                </div>
+                <div className="conv-chain-line conv-chain-line-active" />
+                <div className="conv-chain-step conv-chain-done">
+                  <span className="conv-chain-dot">✓</span>
+                  <span>Company signed</span>
+                </div>
+                <div className="conv-chain-line conv-chain-line-active" />
+                <div className="conv-chain-step conv-chain-current">
+                  <span className="conv-chain-dot conv-chain-pulse" />
+                  <span>Your validation</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="conv-footer">
+              <button className="conv-btn-cancel" onClick={onClose}>Cancel</button>
+              <button
+                className="conv-btn-sign conv-btn-sign-ready"
+                disabled={submitting}
+                onClick={() => void handleValidate()}
+              >
+                <CheckCircle size={14} />
+                {submitting ? "Validating…" : "✅ Confirm Validation"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   STATUS HELPERS
+   ══════════════════════════════════════════════════════════ */
+const statusBadgeClass = (s: string) => {
+  if (s === "accepted") return "as-accepted";
+  if (s === "validated") return "as-validated";
+  if (s === "refused") return "as-refused";
+  if (s === "rejected") return "as-rejected";
+  return "as-pending";
 };
 
-const TABS = ['All', 'Pending', 'Under Review', 'Accepted', 'Rejected'] as const;
-type Tab = typeof TABS[number];
+function initials(name: string) {
+  return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+}
 
-const tabStatusMap: Record<Tab, AppStatus | null> = {
-    'All': null,
-    'Pending': 'pending',
-    'Under Review': 'under_review',
-    'Accepted': 'accepted',
-    'Rejected': 'rejected',
-};
+function countByStatus(rows: AppRow[], s: string) {
+  return rows.filter(r => r.status === s).length;
+}
 
-const DOMAINS = ['All Domains', 'Informatique', 'Électronique', 'Télécom', 'Sécurité', 'Automatique'];
-
-const domainColor: Record<string, string> = {
-    'Informatique': 'dom-info',
-    'Électronique': 'dom-elec',
-    'Télécom': 'dom-tel',
-    'Sécurité': 'dom-sec',
-    'Automatique': 'dom-auto',
-};
-
-const companyLogoColor = (initial: string): string => {
-    const map: Record<string, string> = {
-        S: '#1a4f3a', M: '#1d4ed8', O: '#7c3aed',
-        A: '#0f766e', C: '#b45309',
-    };
-    return map[initial] ?? '#6b6860';
-};
-
-/* ══════════════════════════════════════════════════════════════
-   SUB-COMPONENTS
-   ══════════════════════════════════════════════════════════════ */
-
-/* ── Application card row ── */
-const ApplicationCard: React.FC<{
-    app: Application;
-    selected: boolean;
-    index: number;
-    onClick: () => void;
-}> = ({ app: a, selected, index, onClick }) => {
-    const cfg = STATUS_CONFIG[a.status];
-    return (
-        <motion.div
-            className={`app-card ${selected ? 'selected' : ''}`}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.035 }}
-            onClick={onClick}
-        >
-            {/* Company logo */}
-            <div
-                className="app-company-logo"
-                style={{ background: companyLogoColor(a.companyInitial) }}
-            >
-                {a.companyInitial}
-            </div>
-
-            {/* Center info */}
-            <div className="app-card-body">
-                <div className="app-card-top">
-                    <span className="app-card-role">{a.role}</span>
-                    {!a.cvUploaded && (
-                        <span className="app-no-cv-badge">
-                            <AlertCircle size={10} /> No CV
-                        </span>
-                    )}
-                </div>
-                <div className="app-card-parties">
-                    <span className="app-party student">
-                        <GraduationCap size={11} />
-                        {a.studentName}
-                        <span className="app-party-sub">{a.studentLevel} · {a.studentSpecialty}</span>
-                    </span>
-                    <span className="app-party-arrow">→</span>
-                    <span className="app-party company">
-                        <Building2 size={11} />
-                        {a.company}
-                        <span className="app-party-sub">{a.companyWilaya}</span>
-                    </span>
-                </div>
-                <div className="app-card-meta">
-                    <span><Tag size={11} />
-                        <span className={`off-domain-tag ${domainColor[a.domain] || ''}`} style={{ fontSize: 10 }}>
-                            {a.domain}
-                        </span>
-                    </span>
-                    <span><CalendarDays size={11} />{a.submittedAt}</span>
-                    <span><MapPin size={11} />{a.studentWilaya}</span>
-                </div>
-            </div>
-
-            {/* Right: status + id */}
-            <div className="app-card-right">
-                <span className="app-card-id">{a.id}</span>
-                <span className={`app-status-badge ${cfg.cls}`}>
-                    <cfg.icon size={10} />
-                    {cfg.label}
-                </span>
-                <ChevronRight size={13} className="off-chevron" />
-            </div>
-        </motion.div>
-    );
-};
-
-/* ── Detail drawer ── */
-const ApplicationDrawer: React.FC<{
-    app: Application;
-    onClose: () => void;
-    onAccept: (id: string) => void;
-    onReject: (id: string) => void;
-    onReview: (id: string) => void;
-}> = ({ app: a, onClose, onAccept, onReject, onReview }) => {
-    const cfg = STATUS_CONFIG[a.status];
-
-    return (
-        <motion.aside
-            className="app-drawer"
-            initial={{ opacity: 0, x: 28 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 28 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-        >
-            {/* Head */}
-            <div className="app-drawer-head">
-                <div
-                    className="app-drawer-logo"
-                    style={{ background: companyLogoColor(a.companyInitial) }}
-                >
-                    {a.companyInitial}
-                </div>
-                <div className="app-drawer-title">
-                    <h2>{a.role}</h2>
-                    <span>{a.company} · {a.companyWilaya}</span>
-                </div>
-                <button className="off-drawer-close" onClick={onClose}>
-                    <X size={16} />
-                </button>
-            </div>
-
-            {/* Status row */}
-            <div className="app-drawer-status-row">
-                <span className={`app-status-pill ${cfg.cls}`}>
-                    <cfg.icon size={12} />
-                    {cfg.label}
-                </span>
-                <span className="app-drawer-id">{a.id}</span>
-            </div>
-
-            {/* Parties */}
-            <div className="app-drawer-parties">
-                {/* Student */}
-                <div className="app-party-block">
-                    <div className="app-party-block-head">
-                        <GraduationCap size={13} />
-                        <span>Student</span>
-                    </div>
-                    <div className="app-party-block-body">
-                        <span className="app-pb-name">{a.studentName}</span>
-                        <span className="app-pb-sub">{a.studentLevel} · {a.studentSpecialty}</span>
-                        <a href={`mailto:${a.studentEmail}`} className="app-pb-email">
-                            <Mail size={11} /> {a.studentEmail}
-                        </a>
-                        <span className="app-pb-sub"><MapPin size={10} /> {a.studentWilaya}</span>
-                    </div>
-                </div>
-
-                {/* Offer */}
-                <div className="app-party-block">
-                    <div className="app-party-block-head">
-                        <Briefcase size={13} />
-                        <span>Offer Details</span>
-                    </div>
-                    <div className="app-party-block-body">
-                        <span className="app-pb-name">{a.role}</span>
-                        <span className="app-pb-sub">{a.company}</span>
-                        <span className="app-pb-sub"><CalendarDays size={10} /> {a.offerDuration} · {a.offerStart}</span>
-                        <span className="app-pb-sub"><MapPin size={10} /> {a.companyWilaya}</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Timeline */}
-            <div className="app-timeline">
-                <div className="app-timeline-item">
-                    <div className="app-tl-dot tl-submitted" />
-                    <div>
-                        <span className="app-tl-label">Submitted</span>
-                        <span className="app-tl-date">{a.submittedAt}</span>
-                    </div>
-                </div>
-                {a.status !== 'pending' && (
-                    <div className="app-timeline-item">
-                        <div className={`app-tl-dot tl-${a.status}`} />
-                        <div>
-                            <span className="app-tl-label">{cfg.label}</span>
-                            <span className="app-tl-date">{a.updatedAt}</span>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Cover note */}
-            <div className="app-drawer-section">
-                <h3><FileText size={12} /> Cover Note</h3>
-                <p>{a.coverNote}</p>
-            </div>
-
-            {/* CV status */}
-            <div className="app-drawer-section">
-                <h3><FileText size={12} /> CV</h3>
-                {a.cvUploaded ? (
-                    <div className="app-cv-row">
-                        <span className="app-cv-name">
-                            <CheckCircle size={13} style={{ color: 'var(--green)' }} />
-                            {a.studentName.replace(' ', '_').toLowerCase()}_cv.pdf
-                        </span>
-                        <button className="adm-action-icon" title="Download CV">
-                            <TrendingUp size={13} />
-                        </button>
-                    </div>
-                ) : (
-                    <div className="app-cv-missing">
-                        <AlertCircle size={13} />
-                        No CV uploaded by student
-                    </div>
-                )}
-            </div>
-
-            {/* Action buttons */}
-            <div className="app-drawer-actions">
-                {a.status === 'pending' && (
-                    <button className="app-action-btn review" onClick={() => onReview(a.id)}>
-                        <Eye size={14} /> Mark Under Review
-                    </button>
-                )}
-                {(a.status === 'pending' || a.status === 'under_review') && (
-                    <>
-                        <button className="app-action-btn accept" onClick={() => onAccept(a.id)}>
-                            <CheckCircle size={14} /> Accept Application
-                        </button>
-                        <button className="app-action-btn reject" onClick={() => onReject(a.id)}>
-                            <XCircle size={14} /> Reject Application
-                        </button>
-                    </>
-                )}
-                {(a.status === 'accepted' || a.status === 'rejected') && (
-                    <div className={`app-final-state ${a.status === 'accepted' ? 'state-accepted' : 'state-rejected'}`}>
-                        {a.status === 'accepted'
-                            ? <><CheckCircle size={15} /> Application accepted — convention can be generated</>
-                            : <><XCircle size={15} /> Application has been rejected</>
-                        }
-                    </div>
-                )}
-            </div>
-        </motion.aside>
-    );
-};
-
-/* ══════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════
    MAIN PAGE
-   ══════════════════════════════════════════════════════════════ */
-
+   ══════════════════════════════════════════════════════════ */
 const ADMApplicationsPage: React.FC = () => {
-    const [applications, setApplications] = useState<Application[]>(MOCK_APPLICATIONS);
-    const [activeTab, setActiveTab] = useState<Tab>('All');
-    const [search, setSearch] = useState('');
-    const [domainFilter, setDomainFilter] = useState('All Domains');
-    const [selected, setSelected] = useState<Application | null>(null);
+  const [rows, setRows] = useState<AppRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [rejectTarget, setRejectTarget] = useState<AppRow | null>(null);
+  const [validateTarget, setValidateTarget] = useState<AppRow | null>(null);
 
-    /* ── Filter ── */
-    const filtered = useMemo(() => {
-        const tabStatus = tabStatusMap[activeTab];
-        return applications.filter(a => {
-            const tMatch = !tabStatus || a.status === tabStatus;
-            const dMatch = domainFilter === 'All Domains' || a.domain === domainFilter;
-            const sMatch =
-                a.studentName.toLowerCase().includes(search.toLowerCase()) ||
-                a.company.toLowerCase().includes(search.toLowerCase()) ||
-                a.role.toLowerCase().includes(search.toLowerCase()) ||
-                a.id.toLowerCase().includes(search.toLowerCase());
-            return tMatch && dMatch && sMatch;
-        });
-    }, [applications, activeTab, domainFilter, search]);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("applications/administration/scope/applications/");
+      setRows(unwrapApps(res));
+    } catch {
+      toast.error("Could not load applications.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const tabCount = (tab: Tab) => {
-        const s = tabStatusMap[tab];
-        return !s ? applications.length : applications.filter(a => a.status === s).length;
-    };
+  useEffect(() => { void load(); }, []);
 
-    /* ── Summary counts ── */
-    const counts = useMemo(() => ({
-        total: applications.length,
-        pending: applications.filter(a => a.status === 'pending').length,
-        under_review: applications.filter(a => a.status === 'under_review').length,
-        accepted: applications.filter(a => a.status === 'accepted').length,
-        rejected: applications.filter(a => a.status === 'rejected').length,
-    }), [applications]);
+  return (
+    <DashboardLayout pageTitle="Applications">
+      <div className="adm-applications-page">
 
-    /* ── Actions (swap setTimeout → real API call later) ── */
-    const updateStatus = (id: string, status: AppStatus) => {
-        setApplications(prev =>
-            prev.map(a => a.id === id ? { ...a, status, updatedAt: '28 Avr 2026' } : a)
-        );
-        setSelected(prev => prev?.id === id ? { ...prev, status, updatedAt: '28 Avr 2026' } : prev);
-    };
+        {/* ── HERO ── */}
+        <div className="page-hero adm-applications-hero">
+          <div className="hero-overlay" />
+          <div className="hero-content">
+            <h1>Applications</h1>
+            <p>Review and validate internship applications within your scope.</p>
+          </div>
+        </div>
 
-    const handleAccept = (id: string) => updateStatus(id, 'accepted');
-    const handleReject = (id: string) => updateStatus(id, 'rejected');
-    const handleReview = (id: string) => updateStatus(id, 'under_review');
-
-    return (
-        <DashboardLayout pageTitle="Applications"
-        >
-            {/* ── Summary strip ── */}
-            <div className="app-summary-strip">
-                {[
-                    { label: 'Total', val: counts.total, icon: Users, cls: 'sum-total' },
-                    { label: 'Pending', val: counts.pending, icon: Clock, cls: 'sum-amber' },
-                    { label: 'Under Review', val: counts.under_review, icon: Eye, cls: 'sum-blue' },
-                    { label: 'Accepted', val: counts.accepted, icon: CheckCircle, cls: 'sum-green' },
-                    { label: 'Rejected', val: counts.rejected, icon: XCircle, cls: 'sum-red' },
-                ].map(s => (
-                    <div key={s.label} className={`app-sum-card ${s.cls}`}>
-                        <s.icon size={15} />
-                        <span className="app-sum-val">{s.val}</span>
-                        <span className="app-sum-label">{s.label}</span>
-                    </div>
-                ))}
+        {/* ── STATS STRIP ── */}
+        {!loading && (
+          <div className="adm-app-stats">
+            <div className="adm-app-stat">
+              <div className="adm-app-stat-icon total">
+                <FileText size={18} />
+              </div>
+              <div>
+                <div className="adm-app-stat-label">Total</div>
+                <div className="adm-app-stat-val">{rows.length}</div>
+              </div>
             </div>
-
-            {/* ── Toolbar ── */}
-            <div className="app-toolbar">
-                <div className="off-tabs">
-                    {TABS.map(tab => (
-                        <button
-                            key={tab}
-                            className={`off-tab ${activeTab === tab ? 'active' : ''}`}
-                            onClick={() => setActiveTab(tab)}
-                        >
-                            {tab}
-                            <span className={`off-tab-count ${tab === 'Pending' ? 'count-amber' :
-                                tab === 'Under Review' ? 'count-blue' :
-                                    tab === 'Rejected' ? 'count-red' : ''
-                                }`}>
-                                {tabCount(tab)}
-                            </span>
-                        </button>
-                    ))}
+            <div className="adm-app-stat">
+              <div className="adm-app-stat-icon accepted">
+                <CheckSquare size={18} />
+              </div>
+              <div>
+                <div className="adm-app-stat-label">Accepted</div>
+                <div className="adm-app-stat-val">{countByStatus(rows, "accepted")}</div>
+              </div>
+            </div>
+            <div className="adm-app-stat">
+              <div className="adm-app-stat-icon pending">
+                <Clock size={18} />
+              </div>
+              <div>
+                <div className="adm-app-stat-label">Pending</div>
+                <div className="adm-app-stat-val">{countByStatus(rows, "pending")}</div>
+              </div>
+            </div>
+            <div className="adm-app-stat">
+              <div className="adm-app-stat-icon rejected">
+                <XSquare size={18} />
+              </div>
+              <div>
+                <div className="adm-app-stat-label">Rejected</div>
+                <div className="adm-app-stat-val">
+                  {countByStatus(rows, "refused") + countByStatus(rows, "rejected")}
                 </div>
-
-                <div className="app-filters">
-                    <div className="off-search" style={{ minWidth: 210 }}>
-                        <Search size={13} />
-                        <input
-                            type="text"
-                            placeholder="Search student, company, role…"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                        />
-                        {search && (
-                            <button onClick={() => setSearch('')} className="off-clear">
-                                <X size={12} />
-                            </button>
-                        )}
-                    </div>
-                    <div className="off-selects">
-                        <Filter size={13} className="filter-icon" />
-                        <select value={domainFilter} onChange={e => setDomainFilter(e.target.value)}>
-                            {DOMAINS.map(d => <option key={d}>{d}</option>)}
-                        </select>
-                    </div>
-                </div>
+              </div>
             </div>
+          </div>
+        )}
 
-            {/* ── Results bar ── */}
-            <div className="stu-results-bar">
-                <span>{filtered.length} application{filtered.length !== 1 ? 's' : ''} found</span>
-                {(search || domainFilter !== 'All Domains') && (
-                    <button className="stu-clear-all" onClick={() => {
-                        setSearch(''); setDomainFilter('All Domains');
-                    }}>
-                        <X size={11} /> Clear filters
-                    </button>
-                )}
+        {/* ── MAIN CARD ── */}
+        <section className="adm-card">
+          <div className="adm-card-head">
+            <div>
+              <h2>All Applications</h2>
+              <p>{rows.length} application{rows.length !== 1 ? "s" : ""} in your scope</p>
             </div>
+            <div className="adm-actions">
+              <Link to="/admin/conventions" className="adm-btn-link">
+                Conventions <ArrowRight size={13} />
+              </Link>
+              <button
+                type="button"
+                className="adm-action-btn approve sm"
+                onClick={() => void load()}
+              >
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+          </div>
 
-            {/* ── Main split ── */}
-            <div className={`app-layout ${selected ? 'with-drawer' : ''}`}>
-
-                {/* List */}
-                <div className="app-list">
-                    {filtered.length === 0 ? (
-                        <div className="off-empty">
-                            <FileText size={32} />
-                            <p>No applications match your filters.</p>
+          {loading ? (
+            <p style={{ padding: "28px 20px", color: "var(--sc-muted)", fontSize: 13 }}>
+              Loading…
+            </p>
+          ) : (
+            <div className="adm-table-wrap">
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Offer</th>
+                    <th>Company</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th style={{ minWidth: 180 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(a => (
+                    <tr key={a.id}>
+                      <td>
+                        <div className="adm-student-cell">
+                          <div className="adm-student-avatar">
+                            {initials(a.student_name)}
+                          </div>
+                          <div>
+                            <div className="fw-medium">{a.student_name}</div>
+                            <div className="adm-cell-sub">{a.student_email}</div>
+                          </div>
                         </div>
-                    ) : (
-                        filtered.map((a, i) => (
-                            <ApplicationCard
-                                key={a.id}
-                                app={a}
-                                selected={selected?.id === a.id}
-                                index={i}
-                                onClick={() => setSelected(a)}
-                            />
-                        ))
-                    )}
-                </div>
+                      </td>
+                      <td>{a.offer_title}</td>
+                      <td className="fw-medium">{a.offer_company_name || "—"}</td>
+                      <td>
+                        <span className={`app-status-badge ${statusBadgeClass(a.status)}`}>
+                          {a.status}
+                        </span>
+                      </td>
+                      <td className="text-muted">
+                        {a.application_date ? String(a.application_date).slice(0, 10) : "—"}
+                      </td>
+                      <td>
+                        {a.status === "accepted" && (
+                          <div className="adm-actions">
+                            <button
+                              type="button"
+                              className="adm-action-btn approve sm"
+                              onClick={() => setValidateTarget(a)}
+                            >
+                              <CheckCircle size={13} /> Validate
+                            </button>
+                            <button
+                              type="button"
+                              className="adm-action-btn reject sm"
+                              onClick={() => setRejectTarget(a)}
+                            >
+                              <XCircle size={13} /> Reject
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
-                {/* Drawer */}
-                <AnimatePresence>
-                    {selected && (
-                        <ApplicationDrawer
-                            key={selected.id}
-                            app={selected}
-                            onClose={() => setSelected(null)}
-                            onAccept={handleAccept}
-                            onReject={handleReject}
-                            onReview={handleReview}
-                        />
-                    )}
-                </AnimatePresence>
+              {rows.length === 0 && (
+                <p className="text-muted" style={{ padding: "32px 20px", textAlign: "center" }}>
+                  No applications in your scope.
+                </p>
+              )}
             </div>
-        </DashboardLayout>
-    );
+          )}
+        </section>
+
+        {/* ── MODALS ── */}
+        {validateTarget && (
+          <ValidateModal
+            app={validateTarget}
+            onClose={() => setValidateTarget(null)}
+            onValidated={() => {
+              setValidateTarget(null);
+              toast.success("Internship validated successfully.");
+              void load();
+            }}
+          />
+        )}
+
+        {rejectTarget && (
+          <RejectModal
+            app={rejectTarget}
+            onClose={() => setRejectTarget(null)}
+            onRejected={() => {
+              setRejectTarget(null);
+              toast.success("Application rejected and student notified.");
+              void load();
+            }}
+          />
+        )}
+
+      </div>
+    </DashboardLayout>
+  );
 };
 
 export default ADMApplicationsPage;

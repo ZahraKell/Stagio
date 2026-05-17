@@ -1,8 +1,8 @@
 // AdminUserDetail.tsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-
-const API = "http://localhost:8000/api";
+import api from "../api";
+import toast from "react-hot-toast";
 
 interface UserDetail {
   id: number;
@@ -34,97 +34,72 @@ export default function AdminUserDetail() {
   const fetchUser = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/admin/users/${id}/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.error && data.data) {
-        setUser(data.data);
+      const { data } = await api.get(`admin/users/${id}/`);
+      const body = data as { error?: boolean; data?: UserDetail; message?: string };
+      if (!body.error && body.data) {
+        setUser(body.data);
         setEditForm({
-          full_name: data.data.full_name,
-          email: data.data.email,
-          role: data.data.role,
-          is_active: data.data.is_active,
-          town: data.data.town || "",
-          pnum: data.data.pnum || "",
+          full_name: body.data.full_name,
+          email: body.data.email,
+          role: body.data.role,
+          is_active: body.data.is_active,
+          town: body.data.town || "",
+          pnum: body.data.pnum || "",
         });
       } else {
-        const mock = getMockUser(parseInt(id!));
-        setUser(mock);
-        setEditForm({ full_name: mock.full_name, email: mock.email, role: mock.role, is_active: mock.is_active, town: mock.town || "", pnum: mock.pnum || "" });
+        toast.error(body.message || "User not found.");
+        setUser(null);
       }
     } catch {
-      const mock = getMockUser(parseInt(id!));
-      setUser(mock);
-      setEditForm({ full_name: mock.full_name, email: mock.email, role: mock.role, is_active: mock.is_active, town: mock.town || "", pnum: mock.pnum || "" });
+      toast.error("Could not load user.");
+      setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const getMockUser = (uid: number): UserDetail => {
-    const map: Record<number, UserDetail> = {
-      1: { id: 1, username: "ahmed.benali", email: "ahmed@esi.edu.dz", full_name: "Ahmed Benali", role: "student", is_active: true, town: "Constantine", pnum: "+213 555 123456", date_joined: "2023-09-15", last_login: "2026-04-28" },
-      2: { id: 2, username: "sara.meziane", email: "sara@usthb.dz", full_name: "Sara Meziane", role: "student", is_active: true, town: "Alger", pnum: "+213 555 789012", date_joined: "2023-09-15", last_login: "2026-04-27" },
-      5: { id: 5, username: "sonatrach", email: "contact@sonatrach.dz", full_name: "Sonatrach", role: "company", is_active: true, town: "Alger", pnum: "+213 21 123456", date_joined: "2024-01-10", last_login: "2026-04-28" },
-      8: { id: 8, username: "admin1", email: "admin@stageconnect.dz", full_name: "Admin User", role: "admin", is_active: true, town: "Alger", pnum: "+213 555 999999", date_joined: "2023-01-01", last_login: "2026-04-29" },
-    };
-    return map[uid] || { id: uid, username: `user_${uid}`, email: `user${uid}@example.com`, full_name: `User ${uid}`, role: "student", is_active: true, town: "Alger", pnum: "", date_joined: "2024-01-01", last_login: "2026-04-01" };
-  };
-
   const handleSave = async () => {
     setErrorMsg(""); setSuccessMsg("");
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/admin/users/${id}/update/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(editForm),
-      });
-      const data = await res.json();
-      if (!data.error) {
-        setUser(prev => prev ? { ...prev, ...editForm } : null);
+      const { data } = await api.patch(`admin/users/${id}/update/`, editForm);
+      const body = data as { error?: boolean; message?: string };
+      if (!body.error) {
+        setUser((prev) => (prev ? { ...prev, ...editForm } : null));
         setEditing(false);
         setSuccessMsg("User updated successfully!");
+        toast.success("Saved.");
         setTimeout(() => setSuccessMsg(""), 3000);
       } else {
-        setErrorMsg(data.message || "Update failed.");
+        setErrorMsg(body.message || "Update failed.");
       }
     } catch {
-      // Apply locally anyway
-      setUser(prev => prev ? { ...prev, ...editForm } : null);
-      setEditing(false);
-      setSuccessMsg("User updated locally.");
-      setTimeout(() => setSuccessMsg(""), 3000);
+      setErrorMsg("Update failed.");
+      toast.error("Update failed.");
     }
   };
 
   const handleDelete = async () => {
     if (!window.confirm("Delete this user permanently? This cannot be undone.")) return;
     try {
-      const token = localStorage.getItem("access_token");
-      await fetch(`${API}/admin/users/${id}/delete/`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    } catch {}
+      await api.delete(`admin/users/${id}/delete/`);
+      toast.success("User deleted.");
+    } catch {
+      toast.error("Delete failed.");
+    }
     navigate("/admin/users");
   };
 
   const handleToggleActive = async () => {
     const newStatus = !editForm.is_active;
-    setEditForm(prev => ({ ...prev, is_active: newStatus }));
+    setEditForm((prev) => ({ ...prev, is_active: newStatus }));
     if (user) setUser({ ...user, is_active: newStatus });
     try {
-      const token = localStorage.getItem("access_token");
-      await fetch(`${API}/admin/users/${id}/update/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ is_active: newStatus }),
-      });
-    } catch {}
-    setSuccessMsg(newStatus ? "User activated." : "User deactivated.");
+      await api.patch(`admin/users/${id}/update/`, { is_active: newStatus });
+      setSuccessMsg(newStatus ? "User activated." : "User deactivated.");
+      toast.success(newStatus ? "Activated." : "Deactivated.");
+    } catch {
+      toast.error("Could not update status.");
+    }
     setTimeout(() => setSuccessMsg(""), 3000);
   };
 
@@ -285,7 +260,7 @@ export default function AdminUserDetail() {
           </div>
 
           <div className="am-detail-card">
-            <div className="am-detail-card-header"><h3>ℹ️ Account Info</h3></div>
+            <div className="am-detail-card-header"><h3>ℹï¸ Account Info</h3></div>
             <div className="am-detail-card-body">
               <div style={{ fontSize: ".78rem", color: "#64748b", lineHeight: 1.6 }}>
                 <p><strong>User ID:</strong> #{user.id}</p>

@@ -1,7 +1,7 @@
 // AdminOffers.tsx — Manage all internship offers across all companies
 import { useState, useEffect } from "react";
-
-const API = "http://localhost:8000/api";
+import api from "../api";
+import toast from "react-hot-toast";
 
 interface Offer {
   id: number;
@@ -41,32 +41,49 @@ export default function AdminOffers() {
     fetchOffers();
   }, []);
 
+  const normalizeOffer = (row: Record<string, unknown>): Offer => {
+    const deadline = row.deadline;
+    const datePosted = row.date_posted;
+    return {
+      id: row.id as number,
+      title: row.title as string,
+      company_name: row.company_name as string,
+      company_sector: (row.company_sector as string) || "—",
+      town: row.town as string,
+      duration: (row.duration as string) || "",
+      internship_type: row.internship_type as string,
+      is_paid: Boolean(row.is_paid),
+      salary: (row.salary as string) || null,
+      tech_stack: (row.tech_stack as string) || null,
+      field: (row.field as string) || null,
+      status: row.status as string,
+      date_posted:
+        typeof datePosted === "string"
+          ? datePosted.slice(0, 10)
+          : String(datePosted ?? ""),
+      deadline:
+        deadline == null || deadline === ""
+          ? null
+          : typeof deadline === "string"
+            ? deadline.slice(0, 10)
+            : String(deadline),
+      description: (row.description as string) || "",
+    };
+  };
+
   const fetchOffers = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/offers/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setOffers(Array.isArray(data) ? data : getMockOffers());
+      const { data } = await api.get("admin/offers/");
+      const rows = Array.isArray(data) ? data : [];
+      setOffers(rows.map((r) => normalizeOffer(r as Record<string, unknown>)));
     } catch {
-      setOffers(getMockOffers());
+      setOffers([]);
+      toast.error("Could not load offers.");
     } finally {
       setLoading(false);
     }
   };
-
-  const getMockOffers = (): Offer[] => [
-    { id: 1, title: "Développeur Django Backend", company_name: "Sonatrach", company_sector: "Énergie", town: "Alger", duration: "3 mois", internship_type: "INTERNSHIP", is_paid: false, salary: null, tech_stack: "Python, Django, REST API", field: "Informatique", status: "open", date_posted: "2026-04-01", deadline: "2026-05-15", description: "Développement d'APIs REST." },
-    { id: 2, title: "Data Analyst & Visualisation", company_name: "Mobilis", company_sector: "Télécommunications", town: "Alger", duration: "6 mois", internship_type: "FINAL_YEAR", is_paid: true, salary: "15000 DA/mois", tech_stack: "Python, Pandas, Power BI", field: "Data Science", status: "open", date_posted: "2026-04-05", deadline: "2026-05-20", description: "Analyse des données clients." },
-    { id: 3, title: "Développeur React Frontend", company_name: "Condor Electronics", company_sector: "Électronique", town: "Bordj Bou Arreridj", duration: "4 mois", internship_type: "INTERNSHIP", is_paid: true, salary: "12000 DA/mois", tech_stack: "React, TypeScript, CSS", field: "Informatique", status: "open", date_posted: "2026-04-10", deadline: "2026-05-30", description: "Développement frontend." },
-    { id: 4, title: "Cybersecurity Analyst", company_name: "Algérie Télécom", company_sector: "Télécommunications", town: "Sétif", duration: "5 mois", internship_type: "ALTERNANCE", is_paid: false, salary: null, tech_stack: "Wireshark, Metasploit, Linux", field: "Sécurité", status: "open", date_posted: "2026-04-08", deadline: "2026-06-01", description: "Sécurité réseau." },
-    { id: 5, title: "Designer UI/UX Mobile", company_name: "Ooredoo", company_sector: "Télécommunications", town: "Alger", duration: "3 mois", internship_type: "INTERNSHIP", is_paid: false, salary: null, tech_stack: "Figma, Adobe XD", field: "Design", status: "closed", date_posted: "2026-03-15", deadline: null, description: "Design mobile." },
-    { id: 6, title: "DevOps Engineer Intern", company_name: "Cevital", company_sector: "Agroalimentaire", town: "Béjaïa", duration: "4 mois", internship_type: "FINAL_YEAR", is_paid: true, salary: "18000 DA/mois", tech_stack: "Docker, Kubernetes, CI/CD", field: "Informatique", status: "filled", date_posted: "2026-03-20", deadline: "2026-04-30", description: "Infrastructure DevOps." },
-    { id: 7, title: "Machine Learning Engineer", company_name: "Sonatrach", company_sector: "Énergie", town: "Alger", duration: "6 mois", internship_type: "FINAL_YEAR", is_paid: true, salary: "20000 DA/mois", tech_stack: "Python, TensorFlow, PyTorch", field: "Data Science", status: "open", date_posted: "2026-04-12", deadline: "2026-05-25", description: "IA appliquée." },
-    { id: 8, title: "Network Engineer Intern", company_name: "Mobilis", company_sector: "Télécommunications", town: "Constantine", duration: "3 mois", internship_type: "INTERNSHIP", is_paid: false, salary: null, tech_stack: "CCNA, Cisco, Linux", field: "Réseaux", status: "open", date_posted: "2026-04-15", deadline: "2026-06-15", description: "Administration réseau." },
-  ];
 
   const filtered = offers.filter(o => {
     const matchStatus = filter === "all" ? true : o.status === filter;
@@ -92,15 +109,33 @@ export default function AdminOffers() {
     filled: { label: "Filled", badge: "am-badge-review", color: "#8b5cf6" },
   };
 
-  const closeOffer = (id: number) => {
-    setOffers(prev => prev.map(o => o.id === id ? { ...o, status: "closed" } : o));
-    setSuccessMsg("Offer closed successfully.");
+  const closeOffer = async (id: number) => {
+    try {
+      const { data } = await api.patch(`admin/offers/${id}/status/`, { status: "closed" });
+      const row = data as Record<string, unknown>;
+      setOffers((prev) =>
+        prev.map((o) => (o.id === id ? normalizeOffer(row) : o)),
+      );
+      setSuccessMsg("Offer closed successfully.");
+      toast.success("Offer closed.");
+    } catch {
+      toast.error("Could not close offer.");
+    }
     setTimeout(() => setSuccessMsg(""), 3000);
   };
 
-  const reopenOffer = (id: number) => {
-    setOffers(prev => prev.map(o => o.id === id ? { ...o, status: "open" } : o));
-    setSuccessMsg("Offer reopened.");
+  const reopenOffer = async (id: number) => {
+    try {
+      const { data } = await api.patch(`admin/offers/${id}/status/`, { status: "open" });
+      const row = data as Record<string, unknown>;
+      setOffers((prev) =>
+        prev.map((o) => (o.id === id ? normalizeOffer(row) : o)),
+      );
+      setSuccessMsg("Offer reopened.");
+      toast.success("Offer reopened.");
+    } catch {
+      toast.error("Could not reopen offer.");
+    }
     setTimeout(() => setSuccessMsg(""), 3000);
   };
 

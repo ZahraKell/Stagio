@@ -1,8 +1,8 @@
 // AdminStudents.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API = "http://localhost:8000/api";
+import api from "../api";
+import toast from "react-hot-toast";
 
 interface Student {
   id: number;
@@ -31,47 +31,35 @@ export default function AdminStudents() {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/admin/users/?role=student`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.error && Array.isArray(data.data)) {
-        const mapped: Student[] = data.data.map((u: any, i: number) => ({
-          id: u.id,
-          full_name: u.full_name || u.username,
-          email: u.email,
-          username: u.username,
-          student_number: `2024/INF/${String(i + 1).padStart(4, "0")}`,
-          level: ["L1","L2","L3","M1","M2"][i % 5],
-          speciality: ["Informatique","Réseaux","Sécurité","Électronique","Data Science"][i % 5],
-          institution: "Université de Sétif",
-          city: u.town || "Sétif",
-          town: u.town,
-          is_active: u.is_active,
-          status: ["searching","in_internship","completed","no_cv","no_applications"][i % 5] as any,
+      const { data } = await api.get("admin/users/", { params: { role: "student" } });
+      const body = data as { error?: boolean; data?: Array<Record<string, unknown>>; message?: string };
+      if (!body.error && Array.isArray(body.data)) {
+        const mapped: Student[] = body.data.map((u: Record<string, unknown>) => ({
+          id: u.id as number,
+          full_name: (u.full_name as string) || (u.username as string),
+          email: u.email as string,
+          username: u.username as string,
+          student_number: "",
+          level: "",
+          speciality: "",
+          institution: "",
+          city: (u.town as string) || "",
+          town: u.town as string | undefined,
+          is_active: Boolean(u.is_active),
+          status: "searching" as Student["status"],
         }));
-        setStudents(mapped.length ? mapped : getMockStudents());
+        setStudents(mapped);
       } else {
-        setStudents(getMockStudents());
+        setStudents([]);
+        toast.error(body.message || "Could not load students.");
       }
     } catch {
-      setStudents(getMockStudents());
+      setStudents([]);
+      toast.error("Could not load students.");
     } finally {
       setLoading(false);
     }
   };
-
-  const getMockStudents = (): Student[] => [
-    { id: 1, full_name: "Ahmed Benali", email: "ahmed@esi.edu.dz", username: "ahmed.benali", student_number: "2023/INF/0412", level: "L3", speciality: "Informatique", institution: "Université Frères Mentouri", city: "Constantine", is_active: true, status: "in_internship" },
-    { id: 2, full_name: "Lyna Kerboua", email: "lyna@usthb.dz", username: "lyna.kerboua", student_number: "2023/INF/0521", level: "M1", speciality: "Informatique", institution: "USTHB", city: "Alger", is_active: true, status: "completed" },
-    { id: 3, full_name: "Mounir Samir", email: "mounir@esi.edu.dz", username: "mounir.samir", student_number: "2024/INF/0034", level: "L3", speciality: "Réseaux", institution: "Université de Sétif", city: "Sétif", is_active: true, status: "searching" },
-    { id: 4, full_name: "Rahmani Yasmine", email: "yasmine@usthb.dz", username: "rahmani.yasmine", student_number: "2024/SEC/0102", level: "M2", speciality: "Sécurité", institution: "ESI", city: "Alger", is_active: true, status: "no_cv" },
-    { id: 5, full_name: "Kamel Djalil", email: "kamel@univ-bejaia.dz", username: "kamel.djalil", student_number: "2023/ELN/0098", level: "L3", speciality: "Électronique", institution: "Université de Béjaïa", city: "Béjaïa", is_active: true, status: "no_applications" },
-    { id: 6, full_name: "Amira Saadi", email: "amira@univ-oran.dz", username: "amira.saadi", student_number: "2024/INF/0156", level: "L2", speciality: "Informatique", institution: "Université d'Oran", city: "Oran", is_active: true, status: "searching" },
-    { id: 7, full_name: "Karim Lounis", email: "karim@ummto.edu.dz", username: "karim.lounis", student_number: "2024/INF/0078", level: "L3", speciality: "Informatique", institution: "UMMTO", city: "Tizi Ouzou", is_active: false, status: "no_cv" },
-    { id: 8, full_name: "Sara Meziane", email: "sara@usthb.dz", username: "sara.meziane", student_number: "2023/DS/0033", level: "M1", speciality: "Data Science", institution: "USTHB", city: "Alger", is_active: true, status: "completed" },
-  ];
 
   const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
     searching:       { label: "🔍 Searching",      color: "#1e40af", bg: "#dbeafe" },

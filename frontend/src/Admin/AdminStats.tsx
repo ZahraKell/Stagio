@@ -1,7 +1,7 @@
 // src/AdminStats.tsx
 import { useState, useEffect } from "react";
-
-const API = "http://localhost:8000/api";
+import api from "../api";
+import toast from "react-hot-toast";
 
 interface StatCard {
   label: string;
@@ -46,62 +46,90 @@ export default function AdminStats() {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const headers = { Authorization: `Bearer ${token}` };
-
       const [usersRes, appsRes, offersRes] = await Promise.allSettled([
-        fetch(`${API}/admin/users/`, { headers }).then(r => r.json()),
-        fetch(`${API}/applications/admin/all/`, { headers }).then(r => r.json()),
-        fetch(`${API}/offers/`, { headers }).then(r => r.json()),
+        api.get("admin/users/"),
+        api.get("applications/admin/all/"),
+        api.get("admin/offers/"),
       ]);
 
-      const users = usersRes.status === "fulfilled" ? (usersRes.value.data || []) : [];
-      const apps = appsRes.status === "fulfilled" ? (appsRes.value.data || []) : [];
-      const offers = offersRes.status === "fulfilled" ? (Array.isArray(offersRes.value) ? offersRes.value : []) : [];
+      type U = { role?: string; is_active?: boolean };
+      const users: U[] =
+        usersRes.status === "fulfilled"
+          ? ((usersRes.value.data as { data?: U[] })?.data ?? [])
+          : [];
+      const apps: unknown[] =
+        appsRes.status === "fulfilled"
+          ? ((appsRes.value.data as { data?: unknown[] })?.data ?? [])
+          : [];
+      const offersRaw =
+        offersRes.status === "fulfilled" ? offersRes.value.data : null;
+      const offers: Array<{ company_name?: string; field?: string | null }> = Array.isArray(offersRaw)
+        ? (offersRaw as typeof offers)
+        : [];
+
+      if (usersRes.status === "rejected" || appsRes.status === "rejected") {
+        toast.error("Some statistics could not be loaded.");
+      }
+
+      const activeStudents = users.filter((u) => u.role === "student" && u.is_active).length;
+      const companies = users.filter((u) => u.role === "company").length;
+
+      const byCompany = new Map<string, number>();
+      for (const o of offers) {
+        const n = o.company_name || "—";
+        byCompany.set(n, (byCompany.get(n) ?? 0) + 1);
+      }
+      const topCo = [...byCompany.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, offersCount]) => ({
+          name,
+          offers: offersCount,
+          applications: 0,
+          conventions: 0,
+        }));
+
+      const byField = new Map<string, number>();
+      for (const o of offers) {
+        const f = (o.field || "").trim() || "Autre";
+        byField.set(f, (byField.get(f) ?? 0) + 1);
+      }
+      const fieldTotal = offers.length || 1;
+      const topSpec = [...byField.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, count]) => ({
+          name,
+          count,
+          percentage: Math.round((count / fieldTotal) * 100),
+        }));
 
       setStats([
-        { label: "Total Users", value: users.length || 245, change: 12, icon: "👥", color: "#3b82f6" },
-        { label: "Active Students", value: users.filter((u: any) => u.role === "student" && u.is_active).length || 180, change: 8, icon: "🎓", color: "#22c55e" },
-        { label: "Companies", value: users.filter((u: any) => u.role === "company").length || 45, change: 5, icon: "🏢", color: "#f59e0b" },
-        { label: "Internship Offers", value: offers.length || 89, change: -3, icon: "📋", color: "#8b5cf6" },
-        { label: "Applications", value: apps.length || 432, change: 15, icon: "📝", color: "#06b6d4" },
-        { label: "Validated Conventions", value: 67, change: 10, icon: "📄", color: "#ef4444" },
+        { label: "Total Users", value: users.length, change: 0, icon: "👥", color: "#3b82f6" },
+        { label: "Active Students", value: activeStudents, change: 0, icon: "🎓", color: "#22c55e" },
+        { label: "Companies", value: companies, change: 0, icon: "🏢", color: "#f59e0b" },
+        { label: "Internship Offers", value: offers.length, change: 0, icon: "📋", color: "#8b5cf6" },
+        { label: "Applications", value: apps.length, change: 0, icon: "📝", color: "#06b6d4" },
+        { label: "Validated Conventions", value: 0, change: 0, icon: "📄", color: "#ef4444" },
       ]);
+
+      setMonthlyData([]);
+      setTopCompanies(topCo);
+      setTopSpecialties(topSpec);
     } catch {
+      toast.error("Statistics failed to load.");
       setStats([
-        { label: "Total Users", value: 245, change: 12, icon: "👥", color: "#3b82f6" },
-        { label: "Active Students", value: 180, change: 8, icon: "🎓", color: "#22c55e" },
-        { label: "Companies", value: 45, change: 5, icon: "🏢", color: "#f59e0b" },
-        { label: "Internship Offers", value: 89, change: -3, icon: "📋", color: "#8b5cf6" },
-        { label: "Applications", value: 432, change: 15, icon: "📝", color: "#06b6d4" },
-        { label: "Validated Conventions", value: 67, change: 10, icon: "📄", color: "#ef4444" },
+        { label: "Total Users", value: 0, change: 0, icon: "👥", color: "#3b82f6" },
+        { label: "Active Students", value: 0, change: 0, icon: "🎓", color: "#22c55e" },
+        { label: "Companies", value: 0, change: 0, icon: "🏢", color: "#f59e0b" },
+        { label: "Internship Offers", value: 0, change: 0, icon: "📋", color: "#8b5cf6" },
+        { label: "Applications", value: 0, change: 0, icon: "📝", color: "#06b6d4" },
+        { label: "Validated Conventions", value: 0, change: 0, icon: "📄", color: "#ef4444" },
       ]);
+      setMonthlyData([]);
+      setTopCompanies([]);
+      setTopSpecialties([]);
     }
-
-    setMonthlyData([
-      { month: "Jan", students: 45, companies: 12, applications: 89 },
-      { month: "Fév", students: 52, companies: 15, applications: 102 },
-      { month: "Mar", students: 65, companies: 18, applications: 145 },
-      { month: "Avr", students: 78, companies: 22, applications: 156 },
-      { month: "Mai", students: 85, companies: 25, applications: 189 },
-      { month: "Juin", students: 95, companies: 30, applications: 210 },
-    ]);
-
-    setTopCompanies([
-      { name: "Sonatrach", offers: 12, applications: 45, conventions: 9 },
-      { name: "Mobilis", offers: 8, applications: 32, conventions: 6 },
-      { name: "Condor Electronics", offers: 6, applications: 28, conventions: 4 },
-      { name: "Algérie Télécom", offers: 5, applications: 20, conventions: 3 },
-      { name: "Cevital Group", offers: 4, applications: 18, conventions: 2 },
-    ]);
-
-    setTopSpecialties([
-      { name: "Informatique", count: 120, percentage: 40 },
-      { name: "Électronique", count: 45, percentage: 15 },
-      { name: "Réseaux", count: 35, percentage: 12 },
-      { name: "Sécurité", count: 30, percentage: 10 },
-      { name: "Data Science", count: 25, percentage: 8 },
-    ]);
 
     setLoading(false);
   };

@@ -1,5 +1,7 @@
 // src/components/CompanyRegisterForm.tsx
-// ─────────────────────────────────────────────────────────
+import type { AxiosError } from "axios";
+import api from "../api";
+// ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 // This component handles the full company registration flow:
 // Step 1 — Company enters email + password → backend creates
 //           a pending account and returns status
@@ -10,14 +12,27 @@
 // When user selects role="company" and submits signup,
 // instead of going to the normal register endpoint,
 // render this component in place of the form.
-// ─────────────────────────────────────────────────────────
+// ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { login } from "../auth";
 
-const API = "http://127.0.0.1:8000";
+function formatApiError(err: unknown): string {
+  const ax = err as AxiosError<{
+    errors?: Record<string, string[]>;
+    message?: string;
+    detail?: string;
+  }>;
+  const d = ax.response?.data;
+  if (d?.message) return d.message;
+  if (d?.detail) return String(d.detail);
+  if (d?.errors) return Object.values(d.errors).flat().join(" ");
+  if (ax.message) return ax.message;
+  return "Une erreur est survenue.";
+}
 
-type Step = "credentials" | "details" | "pending" | "rejected";
+type Step = "credentials" | "otp" | "details" | "pending" | "rejected";
 
 interface Props {
   onBackToLogin: () => void;
@@ -26,29 +41,31 @@ interface Props {
 export default function CompanyRegisterForm({ onBackToLogin }: Props) {
   const navigate = useNavigate();
 
-  const [step,    setStep]    = useState<Step>("credentials");
+  const [step, setStep] = useState<Step>("credentials");
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
-  const [userId,  setUserId]  = useState<number | null>(null);
+  const [error, setError] = useState("");
   const [rejReason, setRejReason] = useState("");
+  const [otpCode, setOtpCode] = useState("");
 
   // Step 1 — credentials
   const [creds, setCreds] = useState({
-    email:    "",
+    email: "",
     password: "",
-    confirm:  "",
+    confirm: "",
   });
 
   // Step 2 — company details
   const [details, setDetails] = useState({
-    full_name:      "",   // contact person name
-    company_name:   "",
+    full_name: "",   // contact person name
+    company_name: "",
     company_sector: "",
-    company_rc:     "",
-    town:           "",
+    company_rc: "",
+    town: "",
+    company_website: "",
+    description: "",
   });
 
-  // ── Step 1 submit ──────────────────────────────────────
+  // ”€”€ Step 1 submit ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
   const handleCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -64,111 +81,89 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
 
     setLoading(true);
     try {
-      // First check if email already exists
-      const checkRes = await fetch(`${API}/api/auth/company/check-email/`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: creds.email }),
-      });
-      const checkData = await checkRes.json();
-
-      if (!checkData.error && checkData.data) {
-        const status = checkData.data.status;
-        if (status === "approved") {
-          setError("Cette adresse email est déjà approuvée. Connectez-vous directement.");
-          setLoading(false);
-          return;
-        }
-        if (status === "pending") {
-          setStep("pending");
-          setLoading(false);
-          return;
-        }
-        if (status === "rejected") {
-          setRejReason(checkData.data.reason || "");
-          setStep("rejected");
-          setLoading(false);
-          return;
-        }
-      }
-
-      // New company — create account
       const autoUsername = creds.email.split("@")[0] + "_" + Date.now().toString().slice(-4);
-      const regRes = await fetch(`${API}/api/auth/register/`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username:  autoUsername,
-          email:     creds.email,
-          password:  creds.password,
-          full_name: "",
-          role:      "company",
-        }),
+      await api.post("auth/register/", {
+        username: autoUsername,
+        email: creds.email,
+        password: creds.password,
+        confirm_password: creds.confirm,
+        full_name: "",
+        role: "company",
       });
-
-      const regData = await regRes.json();
-
-      if (!regRes.ok) {
-        const msgs = Object.values(regData.errors ?? regData).flat().join(" ");
-        throw new Error(msgs || "Erreur lors de l'inscription.");
-      }
-
-      // Save user id if returned
-      if (regData.data?.user_id) setUserId(regData.data.user_id);
-
-      // Move to step 2 — fill company details
-      setStep("details");
-
+      setStep("otp");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue.");
+      setError(formatApiError(err));
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Step 2 submit ──────────────────────────────────────
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await api.post("auth/verify-otp/", { email: creds.email, code: otpCode.trim() });
+      await login(creds.email, creds.password);
+      setStep("details");
+    } catch (err: unknown) {
+      setError(formatApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await api.post("auth/resend-otp/", { email: creds.email });
+    } catch (err: unknown) {
+      setError(formatApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ”€”€ Step 2 submit ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
   const handleDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (!details.full_name.trim() || !details.company_name.trim() ||
-        !details.company_rc.trim() || !details.town.trim()) {
+      !details.company_rc.trim() || !details.town.trim()) {
       setError("Veuillez remplir tous les champs obligatoires.");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/auth/company/complete/`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email:          creds.email,
-          full_name:      details.full_name,
-          company_name:   details.company_name,
-          company_sector: details.company_sector,
-          company_rc:     details.company_rc,
-          town:           details.town,
-        }),
+      await api.patch("auth/company/complete-profile/", {
+        full_name: details.full_name,
+        company_name: details.company_name,
+        company_sector: details.company_sector,
+        company_rc: details.company_rc,
+        company_website: details.company_website,
+        town: details.town,
+        description: details.description,
       });
-
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(
-          Object.values(d.errors ?? d).flat().join(" ") || "Erreur."
-        );
-      }
-
+      localStorage.setItem("company_status", "pending_approval");
       setStep("pending");
-
+      navigate("/company/dashboard");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue.");
+      const ax = err as AxiosError;
+      const st = ax.response?.status;
+      if (st === 401 || st === 403) {
+        setStep("pending");
+        return;
+      }
+      setError(formatApiError(err));
     } finally {
       setLoading(false);
     }
   };
 
-  // ── STEP 1 — Credentials ──────────────────────────────
+  // ”€”€ STEP 1 — Credentials ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
   if (step === "credentials") {
     return (
       <div className="crf-root">
@@ -198,7 +193,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
         <form className="crf-form" onSubmit={handleCredentials} noValidate>
           <div className="crf-field">
             <label>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
               Email professionnel *
             </label>
             <input
@@ -214,7 +209,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
 
           <div className="crf-field">
             <label>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
               Mot de passe *
             </label>
             <input
@@ -229,7 +224,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
 
           <div className="crf-field">
             <label>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
               Confirmer le mot de passe *
             </label>
             <input
@@ -257,7 +252,44 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     );
   }
 
-  // ── STEP 2 — Company Details ──────────────────────────
+  // ”€”€ STEP 2 — OTP Verification ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+  if (step === "otp") {
+    return (
+      <div className="crf-root">
+        <div className="crf-header">
+          <div className="crf-icon">📧</div>
+          <h2 className="crf-title">Vérification Email</h2>
+          <p className="crf-sub">
+            Entrez le code OTP envoyé à <strong>{creds.email}</strong>
+          </p>
+        </div>
+
+        {error && <div className="crf-error">{error}</div>}
+
+        <form className="crf-form" onSubmit={handleVerifyOtp} noValidate>
+          <div className="crf-field">
+            <label>Code OTP *</label>
+            <input
+              type="text"
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value)}
+              placeholder="Entrez le code à 6 chiffres"
+              required
+            />
+          </div>
+
+          <button type="submit" className="crf-btn-primary" disabled={loading}>
+            {loading ? "Vérification…" : "Vérifier et continuer"}
+          </button>
+          <button type="button" className="crf-btn-secondary" onClick={handleResendOtp} disabled={loading}>
+            Renvoyer le code
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  // ”€”€ STEP 3 — Company Details ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
   if (step === "details") {
     return (
       <div className="crf-root">
@@ -287,7 +319,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
         <form className="crf-form" onSubmit={handleDetails} noValidate>
           <div className="crf-field">
             <label>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
               Nom du responsable (personne de contact) *
             </label>
             <input
@@ -301,7 +333,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
 
           <div className="crf-field">
             <label>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="15" rx="1"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="15" rx="1" /><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" /></svg>
               Raison sociale (nom officiel) *
             </label>
             <input
@@ -315,7 +347,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
 
           <div className="crf-field">
             <label>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" /></svg>
               Secteur d'activité
             </label>
             <select
@@ -338,7 +370,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
 
           <div className="crf-field">
             <label>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
               Numéro RC (Registre de Commerce) *
             </label>
             <input
@@ -352,10 +384,40 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
               Obligatoire pour vérifier l'existence légale de votre entreprise
             </span>
           </div>
+          <div className="crf-field">
+            <label>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+              Description
+            </label>
+            <input
+              type="text"
+              value={details.description}
+              onChange={e => setDetails({ ...details, description: e.target.value })}
+              placeholder="ex: our company is..."
+              required
+            />
+            <span className="crf-hint">
+              Obligatoire pour vérifier l'existence légale de votre entreprise
+            </span>
+          </div>
 
           <div className="crf-field">
             <label>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z" /><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" /></svg>
+              Site web de l'entreprise *
+            </label>
+            <input
+              type="url"
+              value={details.company_website}
+              onChange={e => setDetails({ ...details, company_website: e.target.value })}
+              placeholder="ex: https://www.votreentreprise.dz"
+              required
+            />
+          </div>
+
+          <div className="crf-field">
+            <label>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
               Ville (Wilaya) *
             </label>
             <input
@@ -375,7 +437,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     );
   }
 
-  // ── STEP 3 — Pending ──────────────────────────────────
+  // ”€”€ STEP 3 — Pending ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
   if (step === "pending") {
     return (
       <div className="crf-root crf-status-root">
@@ -411,7 +473,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     );
   }
 
-  // ── STEP 4 — Rejected ─────────────────────────────────
+  // ”€”€ STEP 4 — Rejected ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
   return (
     <div className="crf-root crf-status-root">
       <div className="crf-status-icon crf-icon-rejected">❌</div>

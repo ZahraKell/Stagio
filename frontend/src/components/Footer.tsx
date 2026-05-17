@@ -8,7 +8,7 @@ const Footer: React.FC = () => {
     <footer className="hs-footer">
       <div className="hs-footer-grid">
         <div className="hs-footer-brand">
-          <Link to="/" className="hs-footer-logo">Stag<span style={{ color: "#F5C518" }}>.io</span></Link>
+          <Link to="/" className="hs-footer-logo"><img src="/src/assets/logo-b-removed.png" alt="InternChips" style={{ height: "80px", objectFit: "contain" }} /></Link>
           <p>Connecting students with top companies across Algeria. Your future starts here.</p>
           <div className="social-media">
             <a href="#" aria-label="Facebook" className="social-icon fb"><FaFacebook /></a>

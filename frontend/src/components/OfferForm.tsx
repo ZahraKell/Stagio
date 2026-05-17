@@ -1,5 +1,6 @@
+import api from "../api";
 // src/components/OfferForm.tsx
-// ─────────────────────────────────────────────────────────────
+// ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 //  Shared form used in TWO places:
 //    1. CreateOffer page  → mode="create", no initialData
 //    2. OfferDetail page  → mode="update", pass initialData
@@ -7,12 +8,12 @@
 //  Usage:
 //    <OfferForm mode="create" onSuccess={() => navigate("/company/offers")} />
 //    <OfferForm mode="update" initialData={offer} onSuccess={handleSaved} onCancel={close} />
-// ─────────────────────────────────────────────────────────────
+// ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-// ── TYPES ──────────────────────────────────────────────────
+// ”€”€ TYPES ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 export interface OfferFormData {
   title:           string;
   town:            string;
@@ -52,7 +53,6 @@ const EMPTY: OfferFormData = {
 
 export default function OfferForm({ mode, initialData, onSuccess, onCancel, insideModal }: Props) {
   const navigate = useNavigate();
-  const token    = localStorage.getItem("access_token");
 
   const [form,    setForm]    = useState<OfferFormData>({ ...EMPTY, ...initialData });
   const [saving,  setSaving]  = useState(false);
@@ -84,26 +84,10 @@ export default function OfferForm({ mode, initialData, onSuccess, onCancel, insi
     };
 
     try {
-      const url    = mode === "create"
-        ? "http://127.0.0.1:8000/api/offers/create/"
-        : `http://127.0.0.1:8000/api/offers/${initialData?.id}/update/`;
-      const method = mode === "create" ? "POST" : "PUT";
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(
-          Object.values(d.errors ?? d).flat().join(" ") ||
-          (mode === "create" ? "Erreur lors de la création." : "Erreur lors de la mise à jour.")
-        );
+      if (mode === "create") {
+        await api.post("offers/create/", payload);
+      } else {
+        await api.put(`offers/${initialData?.id}/update/`, payload);
       }
 
       setSuccess(
@@ -119,13 +103,27 @@ export default function OfferForm({ mode, initialData, onSuccess, onCancel, insi
       }
 
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue.");
+      const ax = err as { response?: { data?: Record<string, unknown> } };
+      const d = ax.response?.data;
+      const msg =
+        d && typeof d === "object"
+          ? String(
+              Object.values((d.errors as Record<string, unknown>) ?? d)
+                .flat()
+                .join(" ") || (d.message as string) || (d.detail as string) || ""
+            )
+          : "";
+      setError(
+        msg ||
+          (err instanceof Error ? err.message : "") ||
+          (mode === "create" ? "Erreur lors de la création." : "Erreur lors de la mise à jour.")
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  // ── Step 1 validation ──
+  // ”€”€ Step 1 validation ”€”€
   const step1Valid = form.title.trim() && form.town.trim() && form.description.trim();
 
   return (
@@ -173,7 +171,7 @@ export default function OfferForm({ mode, initialData, onSuccess, onCancel, insi
 
       <form onSubmit={handleSubmit} noValidate>
 
-        {/* ── STEP 1 / UPDATE: Essential info ── */}
+        {/* ”€”€ STEP 1 / UPDATE: Essential info ”€”€ */}
         <div className={`of-section${(mode === "create" && step === 2) ? " of-hidden" : ""}`}>
           {!insideModal && <h3 className="of-section-title">Informations essentielles</h3>}
 
@@ -253,7 +251,7 @@ export default function OfferForm({ mode, initialData, onSuccess, onCancel, insi
           </div>
         </div>
 
-        {/* ── STEP 2 / UPDATE: Details ── */}
+        {/* ”€”€ STEP 2 / UPDATE: Details ”€”€ */}
         <div className={`of-section${(mode === "create" && step === 1) ? " of-hidden" : ""}`}>
           {!insideModal && mode === "create" && (
             <h3 className="of-section-title">Détails et compétences</h3>
@@ -335,7 +333,7 @@ export default function OfferForm({ mode, initialData, onSuccess, onCancel, insi
           </div>
         </div>
 
-        {/* ── FORM ACTIONS ── */}
+        {/* ”€”€ FORM ACTIONS ”€”€ */}
         <div className="of-actions">
 
           {/* Create mode — step navigation */}

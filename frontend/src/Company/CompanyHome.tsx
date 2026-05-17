@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import CompanyLayout from "../components/CompanyLayout";
+import api from "../api";
+import toast from "react-hot-toast";
 
-// ── TYPES ──────────────────────────────────────────────────
+// ”€”€ TYPES ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 interface Stats {
   total_applications:  number;
   new_this_week:       number;
@@ -21,6 +23,7 @@ interface PendingAction {
   student: string;
   offer:   string;
   date:    string;
+  linkTo:  string;
 }
 
 interface RecentApp {
@@ -32,7 +35,7 @@ interface RecentApp {
   cv_score: number;
 }
 
-// ── HELPERS ────────────────────────────────────────────────
+// ”€”€ HELPERS ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   pending:   { label: "En attente",  cls: "badge-pending"   },
   reviewed:  { label: "En révision", cls: "badge-reviewed"  },
@@ -58,7 +61,7 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
-// ── STAT CARD ──────────────────────────────────────────────
+// ”€”€ STAT CARD ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 function StatCard({
   value, label, sub, accent, icon,
 }: {
@@ -81,10 +84,9 @@ function StatCard({
   );
 }
 
-// ── MAIN ───────────────────────────────────────────────────
+// ”€”€ MAIN ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 export default function CompanyHome() {
   const fullName = localStorage.getItem("full_name") || "Responsable";
-  const token    = localStorage.getItem("access_token");
 
   const [stats,   setStats]   = useState<Stats | null>(null);
   const [actions, setActions] = useState<PendingAction[]>([]);
@@ -92,36 +94,131 @@ export default function CompanyHome() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const h = { Authorization: `Bearer ${token}` };
+    let cancelled = false;
+    (async () => {
+      try {
+        const [statsRes, recentRes, actionsRes, offersRes] = await Promise.allSettled([
+          api.get("applications/company-stats/"),
+          api.get("applications/company-recent/"),
+          api.get("applications/company-actions/"),
+          api.get("offers/mine/"),
+        ]);
 
-    Promise.allSettled([
-      fetch("http://127.0.0.1:8000/api/applications/company-stats/",   { headers: h }).then(r => r.json()),
-      fetch("http://127.0.0.1:8000/api/applications/company-recent/",  { headers: h }).then(r => r.json()),
-      fetch("http://127.0.0.1:8000/api/applications/company-actions/", { headers: h }).then(r => r.json()),
-    ]).then(([s, r, a]) => {
-      // Stats
-      if (s.status === "fulfilled" && !s.value.error) setStats(s.value.data);
-      else setStats({ total_applications: 12, new_this_week: 3, pending: 5, accepted: 4, refused: 3, active_offers: 2, internships_ongoing: 2, conventions_pending: 1 });
+        if (cancelled) return;
 
-      // Recent
-      if (r.status === "fulfilled" && !r.value.error && r.value.data) setRecent(r.value.data);
-      else setRecent([
-        { id: 1, student: "Ali Benali",   offer: "Développeur Django",  status: "pending",  date: "2026-04-22", cv_score: 82 },
-        { id: 2, student: "Sara Meziane", offer: "Data Analyst",        status: "accepted", date: "2026-04-20", cv_score: 91 },
-        { id: 3, student: "Karim Lounis", offer: "Développeur Django",  status: "reviewed", date: "2026-04-18", cv_score: 67 },
-        { id: 4, student: "Nadia Hamdi",  offer: "UI/UX Designer",      status: "refused",  date: "2026-04-17", cv_score: 48 },
-        { id: 5, student: "Youcef Ould",  offer: "Data Analyst",        status: "pending",  date: "2026-04-15", cv_score: 75 },
-      ]);
+        if (statsRes.status === "fulfilled") {
+          const body = statsRes.value.data as { error?: boolean; data?: Record<string, number> };
+          const d = body.data;
+          if (!body.error && d) {
+            const openOffers =
+              offersRes.status === "fulfilled" && Array.isArray(offersRes.value.data)
+                ? (offersRes.value.data as { status?: string }[]).filter((o) => o.status === "open").length
+                : 0;
+            setStats({
+              total_applications: d.total_applications ?? 0,
+              new_this_week: 0,
+              pending: d.pending ?? 0,
+              accepted: d.accepted ?? 0,
+              refused: d.refused ?? 0,
+              active_offers: openOffers,
+              internships_ongoing: d.validated ?? 0,
+              conventions_pending: 0,
+            });
+          } else {
+            setStats(null);
+          }
+        } else {
+          setStats(null);
+        }
 
-      // Actions
-      if (a.status === "fulfilled" && !a.value.error && a.value.data) setActions(a.value.data);
-      else setActions([
-        { id: 1, type: "convention", label: "Convention à signer",        student: "Sara Meziane", offer: "Data Analyst",   date: "2026-04-23" },
-        { id: 2, type: "report",     label: "Rapport de stage à valider", student: "Youcef Ould",  offer: "Backend Dev",    date: "2026-04-21" },
-      ]);
+        if (recentRes.status === "fulfilled") {
+          const body = recentRes.value.data as {
+            error?: boolean;
+            data?: Array<Record<string, unknown>>;
+          };
+          if (!body.error && body.data) {
+            setRecent(
+              body.data.map((row) => ({
+                id: (row.application_id as number) ?? (row.id as number),
+                student: String(row.student_name ?? ""),
+                offer: String(row.offer_title ?? ""),
+                status: String(row.status ?? "pending").toLowerCase(),
+                date: String(row.application_date ?? "").split("T")[0],
+                cv_score: Number((row.cv_score as number) ?? 0),
+              })),
+            );
+          } else setRecent([]);
+        } else setRecent([]);
 
-      setLoading(false);
-    });
+        if (actionsRes.status === "fulfilled") {
+          const body = actionsRes.value.data as {
+            error?: boolean;
+            data?: {
+              pending_candidate_reviews?: number;
+              pending_report_validation?: number;
+              pending_administration_validation?: number;
+            };
+          };
+          const d = body.data;
+          const built: PendingAction[] = [];
+          let nid = 1;
+          if (d?.pending_candidate_reviews && d.pending_candidate_reviews > 0) {
+            built.push({
+              id: nid++,
+              type: "convention",
+              label: `${d.pending_candidate_reviews} candidature(s) en attente de décision`,
+              student: "—",
+              offer: "—",
+              date: "",
+              linkTo: "/company/offers",
+            });
+          }
+          if (d?.pending_report_validation && d.pending_report_validation > 0) {
+            built.push({
+              id: nid++,
+              type: "report",
+              label: `${d.pending_report_validation} rapport(s) à valider`,
+              student: "—",
+              offer: "—",
+              date: "",
+              linkTo: "/company/interns",
+            });
+          }
+          if (d?.pending_administration_validation && d.pending_administration_validation > 0) {
+            built.push({
+              id: nid++,
+              type: "convention",
+              label: `${d.pending_administration_validation} dossier(s) en validation administration`,
+              student: "—",
+              offer: "—",
+              date: "",
+              linkTo: "/company/interns",
+            });
+          }
+          setActions(built);
+        } else setActions([]);
+
+        if (
+          statsRes.status === "rejected" ||
+          recentRes.status === "rejected" ||
+          actionsRes.status === "rejected"
+        ) {
+          toast.error("Certaines données du tableau de bord n'ont pas pu être chargées.");
+        }
+      } catch {
+        if (!cancelled) {
+          setStats(null);
+          setRecent([]);
+          setActions([]);
+          toast.error("Chargement du tableau de bord impossible.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const hour     = new Date().getHours();
@@ -147,12 +244,12 @@ export default function CompanyHome() {
     <CompanyLayout>
       <div className="ch-root">
 
-        {/* ── GREETING BAR ─────────────────────────── */}
+        {/* ”€”€ GREETING BAR ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
         <div className="ch-greet-bar">
           <div className="ch-greet-text">
             <h2 className="ch-greeting">{greeting}, <strong>{fullName}</strong> 👋</h2>
             <p className="ch-greet-sub">
-              Voici un aperçu de votre activité de recrutement sur Stag.io
+              Voici un aperçu de votre activité de recrutement sur InternChips
             </p>
           </div>
           <Link to="/company/offers/new" className="ch-new-btn">
@@ -163,7 +260,7 @@ export default function CompanyHome() {
           </Link>
         </div>
 
-        {/* ── PENDING ACTIONS ──────────────────────── */}
+        {/* ”€”€ PENDING ACTIONS ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
         {actions.length > 0 && (
           <div className="ch-actions-wrap">
             <div className="ch-actions-header">
@@ -180,7 +277,7 @@ export default function CompanyHome() {
                   <span>{a.student} · {a.offer}</span>
                 </div>
                 <Link
-                  to={a.type === "convention" ? `/company/conventions/${a.id}` : `/company/reports/${a.id}`}
+                  to={a.linkTo}
                   className="ch-action-cta"
                 >
                   Traiter →
@@ -190,7 +287,7 @@ export default function CompanyHome() {
           </div>
         )}
 
-        {/* ── STATS GRID ───────────────────────────── */}
+        {/* ”€”€ STATS GRID ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
         <div className="ch-stats-grid">
           <StatCard
             value={stats?.total_applications ?? 0}
@@ -268,7 +365,7 @@ export default function CompanyHome() {
           />
         </div>
 
-        {/* ── BOTTOM ROW ───────────────────────────── */}
+        {/* ”€”€ BOTTOM ROW ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
         <div className="ch-bottom">
 
           {/* Recent applications table */}
@@ -303,7 +400,7 @@ export default function CompanyHome() {
                       <td><StatusBadge status={app.status} /></td>
                       <td><span className="ch-date">{app.date}</span></td>
                       <td>
-                        <Link to={`/company/applications/${app.id}`} className="ch-view-btn">
+                        <Link to={`/company/offers`} className="ch-view-btn">
                           Voir
                         </Link>
                       </td>

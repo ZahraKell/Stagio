@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import CompanyLayout from "../components/CompanyLayout";
+import api from "../api";
+import toast from "react-hot-toast";
 
 interface CompanyProfile {
   company_name: string;
@@ -17,8 +19,6 @@ interface CompanyProfile {
   submitted_at?: string;
   approved_at?: string;
 }
-
-const API = "http://localhost:8000/api";
 
 export default function CompanyProfile() {
   const navigate = useNavigate();
@@ -41,81 +41,69 @@ export default function CompanyProfile() {
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/company/profile/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.error && data.data) {
-        setProfile(data.data);
+      const { data: body } = await api.get("auth/profile/");
+      const res = body as { error?: boolean; data?: Record<string, unknown> };
+      if (!res.error && res.data) {
+        const profileData = res.data as {
+          email?: string;
+          town?: string;
+          pnum?: string;
+          company?: Record<string, unknown> | null;
+        };
+        const companyData = profileData.company ?? {};
+        const cName = (companyData.company_name as string) || "";
+        const approved = Boolean(companyData.is_approved);
+        const rejected = Boolean(companyData.is_rejected);
         setEditForm({
-          company_name: data.data.company_name || "",
-          company_sector: data.data.company_sector || "",
-          company_website: data.data.company_website || "",
-          town: data.data.town || "",
-          description: data.data.description || "",
-          pnum: data.data.pnum || "",
+          company_name: cName,
+          company_sector: (companyData.company_sector as string) || "",
+          company_website: (companyData.company_website as string) || "",
+          town: (companyData.town as string) || (profileData.town as string) || "",
+          description: (companyData.description as string) || "",
+          pnum: (profileData.pnum as string) || "",
         });
+        setProfile({
+          company_name: cName,
+          company_sector: (companyData.company_sector as string) || "",
+          company_website: (companyData.company_website as string) || "",
+          town: (companyData.town as string) || (profileData.town as string) || "",
+          description: (companyData.description as string) || "",
+          email: (profileData.email as string) || "",
+          pnum: (profileData.pnum as string) || "",
+          is_approved: approved,
+          is_rejected: rejected,
+          rejection_reason: companyData.rejection_reason as string | undefined,
+          submitted_at: companyData.submitted_at as string | undefined,
+          approved_at: companyData.approved_at as string | undefined,
+        });
+        if (cName) localStorage.setItem("company_name", cName);
       } else {
-        setProfile(getMockProfile());
-        setEditForm({
-          company_name: getMockProfile().company_name,
-          company_sector: getMockProfile().company_sector,
-          company_website: getMockProfile().company_website,
-          town: getMockProfile().town,
-          description: getMockProfile().description,
-          pnum: getMockProfile().pnum,
-        });
+        toast.error("Could not load company profile.");
+        setProfile(null);
       }
     } catch {
-      const mock = getMockProfile();
-      setProfile(mock);
-      setEditForm({
-        company_name: mock.company_name,
-        company_sector: mock.company_sector,
-        company_website: mock.company_website,
-        town: mock.town,
-        description: mock.description,
-        pnum: mock.pnum,
-      });
+      toast.error("Could not load company profile.");
+      setProfile(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const getMockProfile = (): CompanyProfile => ({
-    company_name: localStorage.getItem("company_name") || "Mon Entreprise",
-    company_sector: "Télécommunications",
-    company_website: "www.example.dz",
-    town: "Alger",
-    description:
-      "Description de votre entreprise. Modifiez ce texte pour présenter votre activité.",
-    email: localStorage.getItem("user_data")
-      ? JSON.parse(localStorage.getItem("user_data") || "{}").email
-      : "contact@example.dz",
-    pnum: "+213 00 00 00 00",
-    is_approved: true,
-    is_rejected: false,
-    submitted_at: "2025-01-01",
-    approved_at: "2025-01-05",
-  });
-
   const handleSave = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      await fetch(`${API}/company/profile/update/`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(editForm),
+      await api.patch("auth/profile/update/", {
+        ...editForm,
+        company_town: editForm.town,
       });
-    } catch {}
-    setProfile((prev) => (prev ? { ...prev, ...editForm } : null));
-    setEditing(false);
-    setSuccessMsg("Profile updated successfully!");
-    setTimeout(() => setSuccessMsg(""), 3000);
+      setProfile((prev) => (prev ? { ...prev, ...editForm } : null));
+      setEditing(false);
+      setSuccessMsg("Profile updated successfully!");
+      toast.success("Profile updated.");
+      setTimeout(() => setSuccessMsg(""), 3000);
+      await fetchProfile();
+    } catch {
+      toast.error("Update failed (your account may be locked while pending approval).");
+    }
   };
 
   if (loading) {
@@ -431,3 +419,5 @@ export default function CompanyProfile() {
     </CompanyLayout>
   );
 }
+
+

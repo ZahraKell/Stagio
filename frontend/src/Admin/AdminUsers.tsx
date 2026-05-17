@@ -1,8 +1,8 @@
 // AdminUsers.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API = "http://localhost:8000/api";
+import api from "../api";
+import toast from "react-hot-toast";
 
 interface User {
   id: number;
@@ -29,56 +29,44 @@ export default function AdminUsers() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const url = filter ? `${API}/admin/users/?role=${filter}` : `${API}/admin/users/`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      if (!data.error) setUsers(data.data || getMockUsers());
-      else setUsers(getMockUsers());
+      const params = filter ? { role: filter } : undefined;
+      const { data } = await api.get("admin/users/", { params });
+      const body = data as { error?: boolean; data?: User[]; message?: string };
+      if (!body.error && Array.isArray(body.data)) setUsers(body.data);
+      else {
+        setUsers([]);
+        toast.error(body.message || "Could not load users.");
+      }
     } catch {
-      setUsers(getMockUsers());
+      setUsers([]);
+      toast.error("Could not load users.");
     } finally {
       setLoading(false);
     }
   };
 
-  const getMockUsers = (): User[] => [
-    { id: 1, username: "ahmed.benali", email: "ahmed@esi.edu.dz", full_name: "Ahmed Benali", role: "student", is_active: true, town: "Constantine" },
-    { id: 2, username: "sara.meziane", email: "sara@usthb.dz", full_name: "Sara Meziane", role: "student", is_active: true, town: "Alger" },
-    { id: 3, username: "karim.lounis", email: "karim@ummto.edu.dz", full_name: "Karim Lounis", role: "student", is_active: true, town: "Tizi Ouzou" },
-    { id: 4, username: "nadia.hamdi", email: "nadia@univ-alger.dz", full_name: "Nadia Hamdi", role: "student", is_active: false, town: "Alger" },
-    { id: 5, username: "sonatrach", email: "contact@sonatrach.dz", full_name: "Sonatrach", role: "company", is_active: true, town: "Alger" },
-    { id: 6, username: "mobilis", email: "rh@mobilis.dz", full_name: "Mobilis", role: "company", is_active: true, town: "Alger" },
-    { id: 7, username: "condor", email: "condor@condor.dz", full_name: "Condor Electronics", role: "company", is_active: false, town: "Bordj Bou Arreridj" },
-    { id: 8, username: "admin1", email: "admin@stageconnect.dz", full_name: "Admin User", role: "admin", is_active: true, town: "Alger" },
-    { id: 9, username: "univ.constantine", email: "admin@univ-constantine.dz", full_name: "Univ Constantine Admin", role: "administration", is_active: true, town: "Constantine" },
-  ];
-
   const handleToggleActive = async (userId: number, current: boolean) => {
     try {
-      const token = localStorage.getItem("access_token");
-      await fetch(`${API}/admin/users/${userId}/update/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ is_active: !current }),
-      });
-    } catch {}
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: !current } : u));
-    setSuccessMsg(`User ${current ? "deactivated" : "activated"} successfully!`);
+      await api.patch(`admin/users/${userId}/update/`, { is_active: !current });
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, is_active: !current } : u)));
+      setSuccessMsg(`User ${current ? "deactivated" : "activated"} successfully!`);
+      toast.success("Updated.");
+    } catch {
+      toast.error("Update failed.");
+    }
     setTimeout(() => setSuccessMsg(""), 3000);
   };
 
   const handleDelete = async (userId: number) => {
     try {
-      const token = localStorage.getItem("access_token");
-      await fetch(`${API}/admin/users/${userId}/delete/`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    } catch {}
-    setUsers(prev => prev.filter(u => u.id !== userId));
-    setDeleteConfirm(null);
-    setSuccessMsg("User deleted successfully!");
+      await api.delete(`admin/users/${userId}/delete/`);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setDeleteConfirm(null);
+      setSuccessMsg("User deleted successfully!");
+      toast.success("Deleted.");
+    } catch {
+      toast.error("Delete failed.");
+    }
     setTimeout(() => setSuccessMsg(""), 3000);
   };
 

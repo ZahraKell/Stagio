@@ -1,8 +1,10 @@
 // src/pages/company/DiscoverCVs.tsx
 import { useState, useEffect, useMemo } from "react";
 import CompanyLayout from "../components/CompanyLayout";
+import api from "../api";
+import toast from "react-hot-toast";
 
-// ── TYPES ──────────────────────────────────────────────────
+// ”€”€ TYPES ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 interface Skill {
   id: number;
   name: string;
@@ -49,7 +51,7 @@ interface StudentCV {
   experiences: Experience[];
 }
 
-// ── LEVEL LABEL MAP ────────────────────────────────────────
+// ”€”€ LEVEL LABEL MAP ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 const SKILL_LEVEL: Record<string, string> = {
   beginner: "Débutant",
   intermediate: "Intermédiaire",
@@ -66,272 +68,52 @@ const LANG_LEVEL: Record<string, string> = {
   native: "Natif",
 };
 
-// ── SCORE COLOR ────────────────────────────────────────────
+// ”€”€ SCORE COLOR ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 const scoreColor = (s: number) =>
   s >= 80 ? "#22c55e" : s >= 55 ? "#f59e0b" : "#ef4444";
 
-// ── MOCK DATA ──────────────────────────────────────────────
-const MOCK: StudentCV[] = [
-  {
-    student_id: 1,
-    full_name: "Sara Meziane",
-    email: "sara.m@usthb.edu.dz",
-    institution: "USTHB",
-    grade: "Master 2",
-    speciality: "Génie Logiciel",
-    cv_score: 91,
-    github: "github.com/sara-dev",
-    linkedin: null,
-    description:
-      "Passionnée par le développement backend et la data science. Cherche un PFE stimulant.",
-    skills: [
-      { id: 1, name: "Python", level: "advanced" },
-      { id: 2, name: "Django", level: "advanced" },
-      { id: 3, name: "PostgreSQL", level: "intermediate" },
-      { id: 4, name: "React", level: "intermediate" },
-      { id: 5, name: "Docker", level: "beginner" },
-    ],
-    languages: [
-      { id: 1, name: "Arabe", level: "native" },
-      { id: 2, name: "Français", level: "C1" },
-      { id: 3, name: "Anglais", level: "B2" },
-    ],
-    educations: [
-      {
-        id: 1,
-        degree: "Master Génie Logiciel",
-        institution: "USTHB",
-        field: "Informatique",
-        start_year: 2024,
-        end_year: null,
-        is_current: true,
-      },
-      {
-        id: 2,
-        degree: "Licence Informatique",
-        institution: "USTHB",
-        field: "Informatique",
-        start_year: 2021,
-        end_year: 2024,
-        is_current: false,
-      },
-    ],
-    experiences: [
-      {
-        id: 1,
-        job_title: "Développeuse Django",
-        company: "Djezzy",
-        location: "Alger",
-        start_date: "2024-06-01",
-        end_date: "2024-08-31",
-        is_current: false,
-        description:
-          "Développement d'APIs REST pour le système de facturation.",
-      },
-    ],
-  },
-  {
-    student_id: 2,
-    full_name: "Ali Benali",
-    email: "ali.benali@esi.edu.dz",
-    institution: "ESI Alger",
-    grade: "Master 1",
-    speciality: "Systèmes Intelligents",
-    cv_score: 82,
-    github: "github.com/ali-benali",
-    linkedin: "linkedin.com/in/ali-benali",
-    description:
-      "Développeur fullstack passionné par l'IA et le machine learning.",
-    skills: [
-      { id: 1, name: "Python", level: "expert" },
-      { id: 2, name: "TensorFlow", level: "intermediate" },
-      { id: 3, name: "FastAPI", level: "advanced" },
-      { id: 4, name: "JavaScript", level: "intermediate" },
-    ],
-    languages: [
-      { id: 1, name: "Arabe", level: "native" },
-      { id: 2, name: "Anglais", level: "C1" },
-      { id: 3, name: "Français", level: "B1" },
-    ],
-    educations: [
-      {
-        id: 1,
-        degree: "Master Systèmes Intelligents",
-        institution: "ESI Alger",
-        field: "IA",
-        start_year: 2023,
-        end_year: null,
-        is_current: true,
-      },
-    ],
-    experiences: [],
-  },
-  {
-    student_id: 3,
-    full_name: "Nadia Hamdi",
-    email: "nadia.h@univ-alger.edu.dz",
-    institution: "Université d'Alger",
-    grade: "Licence 3",
-    speciality: "Informatique",
-    cv_score: 65,
-    github: null,
-    linkedin: null,
-    description:
-      "Étudiante en L3 Informatique, à la recherche d'un stage de découverte.",
-    skills: [
-      { id: 1, name: "Java", level: "intermediate" },
-      { id: 2, name: "SQL", level: "beginner" },
-      { id: 3, name: "HTML", level: "intermediate" },
-    ],
-    languages: [
-      { id: 1, name: "Arabe", level: "native" },
-      { id: 2, name: "Français", level: "B2" },
-    ],
-    educations: [
-      {
-        id: 1,
-        degree: "Licence Informatique",
-        institution: "Université d'Alger",
-        field: "Informatique",
-        start_year: 2021,
-        end_year: null,
-        is_current: true,
-      },
-    ],
-    experiences: [],
-  },
-  {
-    student_id: 4,
-    full_name: "Karim Lounis",
-    email: "k.lounis@ummto.edu.dz",
-    institution: "UMMTO",
-    grade: "Master 2",
-    speciality: "Réseaux et Sécurité",
-    cv_score: 78,
-    github: "github.com/k-lounis",
-    linkedin: "linkedin.com/in/karim-lounis",
-    description:
-      "Spécialisé en cybersécurité et réseaux. Maîtrise des protocoles et outils de sécurité.",
-    skills: [
-      { id: 1, name: "Linux", level: "advanced" },
-      { id: 2, name: "Wireshark", level: "advanced" },
-      { id: 3, name: "Python", level: "intermediate" },
-      { id: 4, name: "Cisco", level: "intermediate" },
-      { id: 5, name: "Kali Linux", level: "advanced" },
-    ],
-    languages: [
-      { id: 1, name: "Arabe", level: "native" },
-      { id: 2, name: "Anglais", level: "B2" },
-      { id: 3, name: "Français", level: "C1" },
-    ],
-    educations: [
-      {
-        id: 1,
-        degree: "Master Réseaux",
-        institution: "UMMTO",
-        field: "Sécurité",
-        start_year: 2023,
-        end_year: null,
-        is_current: true,
-      },
-    ],
-    experiences: [
-      {
-        id: 1,
-        job_title: "Stagiaire Sécurité",
-        company: "Algérie Telecom",
-        location: "Tizi Ouzou",
-        start_date: "2023-07-01",
-        end_date: "2023-09-30",
-        is_current: false,
-        description: "Audit de sécurité des systèmes internes.",
-      },
-    ],
-  },
-  {
-    student_id: 5,
-    full_name: "Meriem Aït Yahia",
-    email: "m.ait@ummto.edu.dz",
-    institution: "UMMTO",
-    grade: "Licence 3",
-    speciality: "Informatique",
-    cv_score: 55,
-    github: null,
-    linkedin: null,
-    description: "En cours de licence, motivée et prête à apprendre.",
-    skills: [
-      { id: 1, name: "C++", level: "beginner" },
-      { id: 2, name: "HTML", level: "intermediate" },
-    ],
-    languages: [
-      { id: 1, name: "Arabe", level: "native" },
-      { id: 2, name: "Français", level: "B1" },
-    ],
-    educations: [
-      {
-        id: 1,
-        degree: "Licence Informatique",
-        institution: "UMMTO",
-        field: "Info",
-        start_year: 2021,
-        end_year: null,
-        is_current: true,
-      },
-    ],
-    experiences: [],
-  },
-  {
-    student_id: 6,
-    full_name: "Youcef Ould Saïd",
-    email: "y.ould@esi.edu.dz",
-    institution: "ESI Alger",
-    grade: "Master 2",
-    speciality: "Base de données",
-    cv_score: 88,
-    github: "github.com/youcef-dev",
-    linkedin: "linkedin.com/in/youcef-ould",
-    description:
-      "Expert en bases de données et systèmes distribués. Cherche un PFE en data engineering.",
-    skills: [
-      { id: 1, name: "PostgreSQL", level: "expert" },
-      { id: 2, name: "MongoDB", level: "advanced" },
-      { id: 3, name: "Python", level: "advanced" },
-      { id: 4, name: "Spark", level: "intermediate" },
-      { id: 5, name: "Kafka", level: "beginner" },
-      { id: 6, name: "Django", level: "intermediate" },
-    ],
-    languages: [
-      { id: 1, name: "Arabe", level: "native" },
-      { id: 2, name: "Anglais", level: "C1" },
-      { id: 3, name: "Français", level: "B2" },
-    ],
-    educations: [
-      {
-        id: 1,
-        degree: "Master Base de Données",
-        institution: "ESI Alger",
-        field: "Data",
-        start_year: 2023,
-        end_year: null,
-        is_current: true,
-      },
-    ],
-    experiences: [
-      {
-        id: 1,
-        job_title: "Data Engineer Intern",
-        company: "Sonatrach",
-        location: "Alger",
-        start_date: "2024-02-01",
-        end_date: "2024-07-31",
-        is_current: false,
-        description: "Pipeline ETL pour les données de production.",
-      },
-    ],
-  },
-];
+function mapStudentCvListItem(r: Record<string, unknown>): StudentCV {
+  const rawSkills = (r.skills as Array<{name: string; level: string}>) || [];
+  const rawLangs = (r.languages as Array<{name: string; level: string}>) || [];
+  const rawEdu = (r.educations as Array<Record<string, unknown>>) || [];
+  const rawExp = (r.experiences as Array<Record<string, unknown>>) || [];
 
-// ── CV DETAIL MODAL ────────────────────────────────────────
+  return {
+    student_id:  r.student_id as number,
+    full_name:   r.full_name as string,
+    email:       r.email as string,
+    institution: (r.institution as string) || null,
+    grade:       (r.grade as string) || null,
+    speciality:  (r.speciality as string) || null,
+    cv_score:    (r.cv_score as number) || 0,
+    github:      (r.github as string) || null,
+    linkedin:    (r.linkedin as string) || null,
+    description: (r.description as string) || null,
+    skills:      rawSkills.map((sk, i) => ({ id: i+1, name: sk.name, level: sk.level })),
+    languages:   rawLangs.map((l, i) => ({ id: i+1, name: l.name, level: l.level })),
+    educations:  rawEdu.map((e, i) => ({
+      id: i+1,
+      degree: String(e.degree ?? ''),
+      institution: String(e.institution ?? ''),
+      field: e.field ? String(e.field) : null,
+      start_year: Number(e.start_year ?? 0),
+      end_year: e.end_year ? Number(e.end_year) : null,
+      is_current: Boolean(e.is_current),
+    })),
+    experiences: rawExp.map((x, i) => ({
+      id: i+1,
+      job_title: String(x.job_title ?? ''),
+      company: String(x.company ?? ''),
+      location: x.location ? String(x.location) : null,
+      start_date: String(x.start_date ?? ''),
+      end_date: x.end_date ? String(x.end_date) : null,
+      is_current: Boolean(x.is_current),
+      description: x.description ? String(x.description) : null,
+    })),
+  };
+}
+
+// ”€”€ CV DETAIL MODAL ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 function CVDetailModal({
   student,
   onClose,
@@ -551,10 +333,8 @@ function CVDetailModal({
   );
 }
 
-// ── MAIN PAGE ──────────────────────────────────────────────
+// ”€”€ MAIN PAGE ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 export default function DiscoverCVs() {
-  const token = localStorage.getItem("access_token");
-
   const [students, setStudents] = useState<StudentCV[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<StudentCV | null>(null);
@@ -566,17 +346,24 @@ export default function DiscoverCVs() {
   const [minScore, setMinScore] = useState("");
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/users/students/cvs/", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!d.error && d.data) setStudents(d.data);
-        else throw new Error();
-      })
-      .catch(() => setStudents(MOCK))
-      .finally(() => setLoading(false));
-  }, [token]);
+    (async () => {
+      try {
+        const { data } = await api.get("users/students/cvs/");
+        const body = data as { error?: boolean; data?: Array<Record<string, unknown>> };
+        if (!body.error && body.data) {
+          setStudents(body.data.map(mapStudentCvListItem));
+        } else {
+          setStudents([]);
+          toast.error("Impossible de charger les CV.");
+        }
+      } catch {
+        setStudents([]);
+        toast.error("Impossible de charger les CV.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   // Collect unique grades for the dropdown
   const grades = useMemo(() => {
@@ -865,3 +652,5 @@ export default function DiscoverCVs() {
     </CompanyLayout>
   );
 }
+
+

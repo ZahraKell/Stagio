@@ -4,62 +4,62 @@ import { Link } from "react-router-dom";
 
 const FAQS = [
     {
-        category: "Général",
+        category: "General",
         items: [
             {
-                q: "Qu'est-ce que Stag.io ?",
-                a: "Stag.io est la première plateforme algérienne entièrement dédiée à la mise en relation des étudiants et des entreprises pour les stages. Gratuite, intuitive et sécurisée.",
+                q: "What is Stag.io?",
+                a: "Stag.io is the first Algerian platform entirely dedicated to connecting students and companies for internships. Free, intuitive and secure.",
             },
             {
-                q: "Qui peut utiliser la plateforme ?",
-                a: "Tout étudiant ou jeune diplômé algérien à la recherche d'un stage. Les entreprises immatriculées en Algérie peuvent également publier leurs offres.",
+                q: "Who can use the platform?",
+                a: "Any Algerian student or recent graduate looking for an internship. Companies registered in Algeria can also post their offers.",
             },
             {
-                q: "Est-ce que c'est gratuit ?",
-                a: "Oui, la plateforme est 100 % gratuite pour les étudiants. Les entreprises bénéficient d'un accès gratuit pour publier leurs premières offres.",
+                q: "Is it free?",
+                a: "Yes, the platform is 100% free for students. Companies get free access to post their first offers.",
             },
         ],
     },
     {
-        category: "Pour les étudiants",
+        category: "For students",
         items: [
             {
-                q: "Comment postuler à une offre ?",
-                a: "Parcourez les offres, trouvez celle qui correspond à votre domaine et à votre wilaya, puis cliquez sur « Postuler ». Vos informations de profil seront transmises directement à l'entreprise.",
+                q: "How do I apply to an offer?",
+                a: "Browse the offers, find the one that matches your field and wilaya, then click \u201cApply\u201d. Your profile information will be sent directly to the company.",
             },
             {
-                q: "Puis-je postuler à plusieurs offres en même temps ?",
-                a: "Oui ! Vous pouvez postuler à autant d'offres que vous souhaitez. Nous recommandons d'adapter votre CV pour chaque poste afin d'augmenter vos chances.",
+                q: "Can I apply to several offers at the same time?",
+                a: "Yes! You can apply to as many offers as you want. We recommend tailoring your CV for each position to increase your chances.",
             },
             {
-                q: "Comment fonctionne la date limite de candidature ?",
-                a: "Vous devez postuler avant la date limite indiquée sur la fiche de l'offre. Les entreprises examinent les candidatures au fil de l'eau, donc postulez tôt !",
+                q: "How does the application deadline work?",
+                a: "You must apply before the deadline shown on the offer page. Companies review applications on a rolling basis, so apply early!",
             },
         ],
     },
     {
-        category: "Pour les entreprises",
+        category: "For companies",
         items: [
             {
-                q: "Comment publier une offre de stage ?",
-                a: "Cliquez sur « Publier une offre » dans la barre de navigation pour créer un compte entreprise. Une fois vérifié, vous pouvez commencer à publier immédiatement.",
+                q: "How do I post an internship offer?",
+                a: "Click \u201cPost an offer\u201d in the navigation bar to create a company account. Once verified, you can start posting right away.",
             },
             {
-                q: "Comment mon entreprise est-elle vérifiée ?",
-                a: "Nous vérifions tous les comptes entreprise à l'aide du RC (Registre de Commerce) pour garantir un environnement sûr et fiable pour les étudiants.",
+                q: "How is my company verified?",
+                a: "We verify all company accounts using the RC (Commercial Register) to guarantee a safe and reliable environment for students.",
             },
         ],
     },
     {
-        category: "Technique",
+        category: "Technical",
         items: [
             {
-                q: "Quels navigateurs sont supportés ?",
-                a: "Stag.io est optimisé pour tous les navigateurs modernes : Chrome, Edge, Safari et Firefox. La plateforme est également entièrement responsive sur mobile.",
+                q: "Which browsers are supported?",
+                a: "Stag.io is optimized for all modern browsers: Chrome, Edge, Safari and Firefox. The platform is also fully responsive on mobile.",
             },
             {
-                q: "J'ai un problème avec mon compte, que faire ?",
-                a: "Si vous avez des difficultés à vous connecter ou à réinitialiser votre mot de passe, contactez notre équipe de support via la page Contact.",
+                q: "I have a problem with my account, what should I do?",
+                a: "If you have trouble logging in or resetting your password, contact our support team through the Contact page.",
             },
         ],
     },
@@ -89,9 +89,9 @@ export default function FAQPage() {
             <div className="page-dark-hero">
                 <div className="page-dark-hero-overlay" />
                 <div className="page-dark-hero-content">
-                    <span className="page-dark-hero-badge">Aide & Support</span>
-                    <h1>Questions fréquentes</h1>
-                    <p>Tout ce que vous devez savoir pour trouver votre stage ou recruter les meilleurs talents.</p>
+                    <span className="page-dark-hero-badge">Help & Support</span>
+                    <h1>Frequently asked questions</h1>
+                    <p>Everything you need to know to find your internship or recruit the best talent.</p>
                 </div>
             </div>
 
@@ -106,10 +106,10 @@ export default function FAQPage() {
                 ))}
 
                 <div className="faq-cta-box">
-                    <h3>Vous n'avez pas trouvé votre réponse ?</h3>
-                    <p>Notre équipe est disponible pour vous aider à naviguer sur la plateforme.</p>
+                    <h3>Didn't find your answer?</h3>
+                    <p>Our team is available to help you navigate the platform.</p>
                     <Link to="/contact">
-                        <button className="cta-primary">Contacter le support</button>
+                        <button className="cta-primary">Contact support</button>
                     </Link>
                 </div>
             </div>

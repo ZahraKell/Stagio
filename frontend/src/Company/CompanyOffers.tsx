@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import CompanyLayout from "../components/CompanyLayout";
+import api from "../api";
+import toast from "react-hot-toast";
 
-// ── TYPES ──────────────────────────────────────────────────
+// ”€”€ TYPES ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 export interface Offer {
   id:              number;
   title:           string;
@@ -20,14 +22,14 @@ export interface Offer {
   description:     string;
 }
 
-// ── TYPE LABEL MAP ─────────────────────────────────────────
+// ”€”€ TYPE LABEL MAP ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 const TYPE_LABELS: Record<string, string> = {
   INTERNSHIP: "Stage professionnel",
   ALTERNANCE: "Alternance",
   FINAL_YEAR: "PFE",
 };
 
-// ── OFFER IMAGE — deterministic from offer id ──────────────
+// ”€”€ OFFER IMAGE — deterministic from offer id ”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 // Uses free Unsplash photos with internship/office themes
 const OFFER_IMAGES = [
   "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=400&auto=format&fit=crop",
@@ -39,7 +41,7 @@ const OFFER_IMAGES = [
 ];
 const offerImg = (id: number) => OFFER_IMAGES[id % OFFER_IMAGES.length];
 
-// ── STATUS PILL ────────────────────────────────────────────
+// ”€”€ STATUS PILL ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
     open:   { label: "Ouverte",  cls: "op-pill-open"   },
@@ -50,7 +52,7 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`op-pill ${s.cls}`}>{s.label}</span>;
 }
 
-// ── SINGLE OFFER CARD ──────────────────────────────────────
+// ”€”€ SINGLE OFFER CARD ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 function OfferCard({ offer, index }: { offer: Offer; index: number }) {
   const navigate = useNavigate();
   const skills   = (offer.tech_stack || offer.skills || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -124,37 +126,28 @@ function OfferCard({ offer, index }: { offer: Offer; index: number }) {
   );
 }
 
-// ── MAIN PAGE ──────────────────────────────────────────────
+// ”€”€ MAIN PAGE ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 export default function CompanyOffers() {
   const navigate = useNavigate();
-  const token    = localStorage.getItem("access_token");
 
   const [offers,   setOffers]   = useState<Offer[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [filter,   setFilter]   = useState<"all" | "open" | "closed" | "filled">("all");
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/offers/mine/", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.json())
-      .then(d => {
-        // Backend returns array directly (serializer list)
-        const data = Array.isArray(d) ? d : (d.data ?? []);
-        setOffers(data);
+    (async () => {
+      try {
+        const { data } = await api.get("offers/mine/");
+        const list = Array.isArray(data) ? data : [];
+        setOffers(list as Offer[]);
+      } catch {
+        setOffers([]);
+        toast.error("Impossible de charger vos offres.");
+      } finally {
         setLoading(false);
-      })
-      .catch(() => {
-        // Mock data while backend is running
-        setOffers([
-          { id: 1, title: "Développeur Django Backend",   town: "Alger",     duration: "3 mois",  internship_type: "INTERNSHIP", is_paid: false, salary: null,          tech_stack: "Python, Django, REST API", skills: null, field: "Informatique", status: "open",   date_posted: "2026-04-01", deadline: "2026-05-15", description: "Développement d'APIs REST pour notre plateforme SaaS." },
-          { id: 2, title: "Data Analyst & Visualisation", town: "Tizi Ouzou", duration: "6 mois",  internship_type: "FINAL_YEAR",  is_paid: true,  salary: "15000 DA/mois", tech_stack: "Python, Pandas, Power BI", skills: null, field: "Data Science",  status: "open",   date_posted: "2026-04-05", deadline: "2026-05-20", description: "Analyse des données clients et création de tableaux de bord." },
-          { id: 3, title: "Designer UI/UX Mobile",        town: "Oran",       duration: "4 mois",  internship_type: "INTERNSHIP", is_paid: false, salary: null,          tech_stack: "Figma, Adobe XD",          skills: null, field: "Design",        status: "closed", date_posted: "2026-03-15", deadline: null,          description: "Conception d'interfaces utilisateur pour notre application mobile." },
-          { id: 4, title: "Développeur React Frontend",   town: "Alger",     duration: "3 mois",  internship_type: "ALTERNANCE",  is_paid: true,  salary: "12000 DA/mois", tech_stack: "React, TypeScript, CSS",   skills: null, field: "Informatique", status: "open",   date_posted: "2026-04-10", deadline: "2026-05-30", description: "Développement de l'interface utilisateur de notre dashboard." },
-        ]);
-        setLoading(false);
-      });
-  }, [token]);
+      }
+    })();
+  }, []);
 
   const filtered = filter === "all" ? offers : offers.filter(o => o.status === filter);
 
@@ -169,7 +162,7 @@ export default function CompanyOffers() {
     <CompanyLayout>
       <div className="op-root">
 
-        {/* ── PAGE HEADER ────────────────────────── */}
+        {/* ”€”€ PAGE HEADER ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
         <div className="op-page-header">
           <div>
             <h2 className="op-page-title">Mes Offres de Stage</h2>
@@ -188,7 +181,7 @@ export default function CompanyOffers() {
           </button>
         </div>
 
-        {/* ── FILTER TABS ─────────────────────────── */}
+        {/* ”€”€ FILTER TABS ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
         <div className="op-tabs">
           {(["all", "open", "closed", "filled"] as const).map(f => (
             <button
@@ -202,7 +195,7 @@ export default function CompanyOffers() {
           ))}
         </div>
 
-        {/* ── LOADING ──────────────────────────────── */}
+        {/* ”€”€ LOADING ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
         {loading && (
           <div className="op-loading">
             <div className="op-spinner" />
@@ -210,7 +203,7 @@ export default function CompanyOffers() {
           </div>
         )}
 
-        {/* ── EMPTY STATE ───────────────────────────── */}
+        {/* ”€”€ EMPTY STATE ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
         {!loading && filtered.length === 0 && (
           <div className="op-empty">
             <div className="op-empty-icon">
@@ -238,7 +231,7 @@ export default function CompanyOffers() {
           </div>
         )}
 
-        {/* ── OFFERS GRID ───────────────────────────── */}
+        {/* ”€”€ OFFERS GRID ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€ */}
         {!loading && filtered.length > 0 && (
           <div className="op-grid">
             {filtered.map((offer, i) => (

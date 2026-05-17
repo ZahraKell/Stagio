@@ -1,365 +1,351 @@
 // src/pages/AdminDashboard.tsx
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import DashboardLayout from '../components/DashboardLayout';
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import DashboardLayout from "../components/DashboardLayout";
 import {
-    Briefcase, FileText, CheckSquare, Building2,
-    Users, Clock, TrendingUp, AlertCircle,
-    ArrowRight, Eye, Download, CheckCircle,
-    XCircle, GraduationCap, MapPin, Activity,
-    CalendarDays,
-} from 'lucide-react';
+  Briefcase,
+  FileText,
+  Building2,
+  CheckSquare,
+  ArrowRight,
+  GraduationCap,
+  TrendingUp,
+  Users,
+  Clock,
+  Download,
+  Eye,
+  Activity,
+} from "lucide-react";
+import api from "../api";
+import toast from "react-hot-toast";
 
-/* ══════════════════════════════════════════════════════════════
-   DATA
-   ══════════════════════════════════════════════════════════════ */
+/* ================================================================
+   TYPES
+   ================================================================ */
 
-const stats = [
-    { label: 'Pending Offers', value: '14', delta: '+3 today', up: true, icon: Briefcase, color: 'stat-amber' },
-    { label: 'Active Applications', value: '87', delta: '+12 this week', up: true, icon: FileText, color: 'stat-blue' },
-    { label: 'Conventions Pending', value: '3', delta: '1 urgent', up: false, icon: CheckSquare, color: 'stat-red' },
-    { label: 'Partner Companies', value: '42', delta: '+2 awaiting', up: true, icon: Building2, color: 'stat-teal' },
-    { label: 'Total Students', value: '1,204', delta: 'Active this semester', up: true, icon: Users, color: 'stat-purple' },
-    { label: 'Avg. Response Time', value: '1.4d', delta: '-0.3d vs last week', up: true, icon: Clock, color: 'stat-green' },
-];
+interface StatsData {
+  period?: string;
+  institution?: string;
+  students?: { total?: number; placed?: number; unplaced?: number };
+  applications?: {
+    total?: number;
+    pending?: number;
+    reviewed?: number;
+    accepted?: number;
+    refused?: number;
+    validated?: number;
+  };
+  offers?: { total?: number | null; open?: number };
+}
 
-const pendingOffers = [
-    { id: 'OF-2026-091', company: 'Sonatrach', wilaya: 'Hassi Messaoud', role: 'Software Engineering Intern', domain: 'Informatique', submitted: '28 Avr 2026', urgent: true },
-    { id: 'OF-2026-090', company: 'Cevital Group', wilaya: 'Béjaïa', role: 'Industrial Automation Intern', domain: 'Électronique', submitted: '27 Avr 2026', urgent: false },
-    { id: 'OF-2026-089', company: 'Ooredoo Algeria', wilaya: 'Alger', role: 'Network Engineering Intern', domain: 'Télécom', submitted: '27 Avr 2026', urgent: false },
-    { id: 'OF-2026-088', company: 'Mobilis', wilaya: 'Constantine', role: 'Mobile Dev Intern', domain: 'Informatique', submitted: '26 Avr 2026', urgent: false },
-];
+interface PendingRow {
+  application_id: number;
+  student_name: string;
+  student_number?: string;
+  speciality?: string;
+  offer_title: string;
+  company_name: string;
+  offer_town?: string;
+  application_date?: string;
+}
 
-const recentApplications = [
-    { id: 'APP-2026-041', student: 'Mounir Samir', level: 'L3 Info', company: 'Mobilis', role: 'Mobile Dev Intern', status: 'pending', date: '20 Avr 2026' },
-    { id: 'APP-2026-040', student: 'Rahmani Yasmine', level: 'M2 Sécu', company: 'Algérie Télécom', role: 'Cybersecurity Intern', status: 'accepted', date: '15 Avr 2026' },
-    { id: 'APP-2026-039', student: 'Hadj Ali Rania', level: 'M1 Info', company: 'Ooredoo Algeria', role: 'Software Engineering Intern', status: 'under_review', date: '27 Avr 2026' },
-    { id: 'APP-2026-038', student: 'Tebbal Omar', level: 'L3 Élec', company: 'Cevital Group', role: 'Industrial Automation Intern', status: 'pending', date: '23 Avr 2026' },
-];
+interface ConventionRow {
+  id: number;
+  student_name: string;
+  company_name: string;
+  offer_title: string;
+  offer_town?: string;
+  status: string;
+}
 
-const recentConventions = [
-    { id: 'CV-2026-081', student: 'Benali Ahmed', company: 'Condor Electronics', status: 'stamped', date: '28 Avr 2026' },
-    { id: 'CV-2026-080', student: 'Kerboua Lyna', company: 'Sonatrach', status: 'complete', date: '26 Avr 2026' },
-    { id: 'CV-2026-079', student: 'Mounir Samir', company: 'Mobilis', status: 'signed_student', date: '25 Avr 2026' },
-];
+/* ================================================================
+   HELPERS
+   ================================================================ */
 
-const pendingCompanies = [
-    { name: 'Cevital Group', initial: 'C', sector: 'Agroalimentaire', wilaya: 'Béjaïa', registered: '28 Avr' },
-    { name: 'Transbois Algérie', initial: 'T', sector: 'Logistique', wilaya: 'Sétif', registered: '27 Avr' },
-];
-
-const activityFeed = [
-    { icon: CheckCircle, color: 'act-green', text: 'Offer OF-2026-087 approved', sub: 'Condor Electronics · Embedded Systems', time: '10 min ago' },
-    { icon: Users, color: 'act-purple', text: 'New student registered', sub: 'Ouali Karim · L2 Télécom · Oran', time: '34 min ago' },
-    { icon: FileText, color: 'act-blue', text: 'Application APP-2026-040 accepted', sub: 'Rahmani Yasmine → Algérie Télécom', time: '1h ago' },
-    { icon: Building2, color: 'act-teal', text: 'Cevital Group registration submitted', sub: 'Awaiting admin approval', time: '2h ago' },
-    { icon: XCircle, color: 'act-red', text: 'Offer OF-2026-085 rejected', sub: 'Missing supervisor & resources info', time: '3h ago' },
-    { icon: CheckSquare, color: 'act-amber', text: 'Convention CV-2026-081 stamped', sub: 'Benali Ahmed · Condor Electronics', time: 'Yesterday' },
-];
-
-/* ── helpers ── */
-const appStatusCfg: Record<string, { cls: string; label: string }> = {
-    pending: { cls: 'as-pending', label: 'Pending' },
-    under_review: { cls: 'as-review', label: 'Under Review' },
-    accepted: { cls: 'as-accepted', label: 'Accepted' },
-    rejected: { cls: 'as-rejected', label: 'Rejected' },
-};
+function unwrapStats(res: { data: unknown }): StatsData | null {
+  const body = res.data as { data?: StatsData; error?: boolean };
+  if (body?.data) return body.data;
+  return null;
+}
 
 const convStatusCfg: Record<string, { cls: string; label: string }> = {
-    generated: { cls: 'cs-generated', label: 'Generated' },
-    sent_student: { cls: 'cs-sent', label: 'Sent' },
-    signed_student: { cls: 'cs-signed-s', label: 'Stud. Signed' },
-    signed_company: { cls: 'cs-signed-c', label: 'Co. Signed' },
-    stamped: { cls: 'cs-stamped', label: 'Stamped' },
-    complete: { cls: 'cs-complete', label: 'Complete' },
+  generated: { cls: "cs-generated", label: "Generated" },
+  sent_student: { cls: "cs-sent", label: "Sent" },
+  signed_student: { cls: "cs-signed-s", label: "Stud. Signed" },
+  signed_company: { cls: "cs-signed-c", label: "Co. Signed" },
+  stamped: { cls: "cs-stamped", label: "Stamped" },
+  complete: { cls: "cs-complete", label: "Complete" },
 };
 
-/* ══════════════════════════════════════════════════════════════
+/* ================================================================
    COMPONENT
-   ══════════════════════════════════════════════════════════════ */
+   ================================================================ */
 
 const AdminDashboard: React.FC = () => {
-    const [offerStates, setOfferStates] = useState<Record<string, 'approved' | 'rejected' | null>>({});
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [pending, setPending] = useState<PendingRow[]>([]);
+  const [conventions, setConventions] = useState<ConventionRow[]>([]);
 
-    const handleOffer = (id: string, action: 'approved' | 'rejected') => {
-        setOfferStates(prev => ({ ...prev, [id]: action }));
-    };
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [sRes, pRes, cRes] = await Promise.all([
+          api.get("applications/stats/"),
+          api.get("applications/pending-validation/"),
+          api.get("conventions/pending-admin/"),
+        ]);
+        setStats(unwrapStats(sRes));
+        const pBody = pRes.data as { pending_validations?: PendingRow[] };
+        setPending(pBody.pending_validations ?? []);
+        const cBody = cRes.data as { data?: ConventionRow[] };
+        setConventions(Array.isArray(cBody.data) ? cBody.data : []);
+      } catch {
+        toast.error("Could not load dashboard data.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
+  const app = stats?.applications;
+  const stud = stats?.students;
+
+  if (loading) {
     return (
-        <DashboardLayout
-            pageTitle="Dashboard"
-        >
-            {/* ── STAT GRID ── */}
-            <section className="adm-stat-grid">
-                {stats.map(s => (
-                    <div key={s.label} className={`adm-stat-card ${s.color}`}>
-                        <div className="adm-stat-icon"><s.icon size={18} /></div>
-                        <div className="adm-stat-body">
-                            <span className="adm-stat-label">{s.label}</span>
-                            <span className="adm-stat-value">{s.value}</span>
-                            <span className={`adm-stat-delta ${s.up ? 'up' : 'down'}`}>
-                                <TrendingUp size={11} /> {s.delta}
-                            </span>
-                        </div>
-                    </div>
-                ))}
-            </section>
-
-            {/* ══ ROW 1: Pending Offers (wide) + Right column ══ */}
-            <div className="adm-row">
-
-                {/* ── PENDING OFFERS TABLE ── */}
-                <section className="adm-card">
-                    <div className="adm-card-head">
-                        <div>
-                            <h2>Pending Offer Validation</h2>
-                            <p>{pendingOffers.length} offers awaiting your review</p>
-                        </div>
-                        <Link to="/admin/offers" className="adm-btn-link">
-                            View all <ArrowRight size={13} />
-                        </Link>
-                    </div>
-                    <div className="adm-table-wrap">
-                        <table className="adm-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Company</th>
-                                    <th>Role</th>
-                                    <th>Domain</th>
-                                    <th>Wilaya</th>
-                                    <th>Submitted</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {pendingOffers.map(o => {
-                                    const decided = offerStates[o.id];
-                                    return (
-                                        <tr key={o.id}>
-                                            <td>
-                                                <span className="adm-id-tag">
-                                                    {o.urgent && <AlertCircle size={11} className="urgent-icon" />}
-                                                    {o.id}
-                                                </span>
-                                            </td>
-                                            <td className="fw-medium">{o.company}</td>
-                                            <td>{o.role}</td>
-                                            <td><span className="badge-domain">{o.domain}</span></td>
-                                            <td>{o.wilaya}</td>
-                                            <td className="text-muted">{o.submitted}</td>
-                                            <td>
-                                                {decided ? (
-                                                    <span className={`adm-decided-label ${decided === 'approved' ? 'dec-approved' : 'dec-rejected'}`}>
-                                                        {decided === 'approved' ? '✓ Approved' : '✗ Rejected'}
-                                                    </span>
-                                                ) : (
-                                                    <div className="adm-actions">
-                                                        <button className="adm-action-btn approve" onClick={() => handleOffer(o.id, 'approved')}>Approve</button>
-                                                        <button className="adm-action-btn reject" onClick={() => handleOffer(o.id, 'rejected')}>Reject</button>
-                                                        <Link to="/admin/offers" className="adm-action-icon" title="View full page">
-                                                            <Eye size={14} />
-                                                        </Link>
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                {/* ── RIGHT COLUMN ── */}
-                <div className="adm-col-right">
-
-                    {/* CONVENTIONS */}
-                    <section className="adm-card">
-                        <div className="adm-card-head">
-                            <div>
-                                <h2>Conventions</h2>
-                                <p>Recent pipeline activity</p>
-                            </div>
-                            <Link to="/admin/conventions" className="adm-btn-link">
-                                View all <ArrowRight size={13} />
-                            </Link>
-                        </div>
-                        <div className="adm-conv-list">
-                            {recentConventions.map(c => {
-                                const cfg = convStatusCfg[c.status] ?? { cls: 'cs-generated', label: c.status };
-                                return (
-                                    <div key={c.id} className="adm-conv-item">
-                                        <div className="adm-conv-meta">
-                                            <span className="adm-conv-id">{c.id}</span>
-                                            <span className={`cv-status-badge ${cfg.cls}`} style={{ fontSize: 10 }}>
-                                                {cfg.label}
-                                            </span>
-                                        </div>
-                                        <p className="adm-conv-names">
-                                            {c.student} <span>→</span> {c.company}
-                                        </p>
-                                        <div className="adm-conv-foot">
-                                            <span className="text-muted">{c.date}</span>
-                                            <button className="adm-action-icon" title="Download PDF">
-                                                <Download size={13} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </section>
-
-                    {/* PENDING COMPANIES */}
-                    <section className="adm-card">
-                        <div className="adm-card-head">
-                            <div>
-                                <h2>New Companies</h2>
-                                <p>Awaiting approval</p>
-                            </div>
-                            <Link to="/admin/companies" className="adm-btn-link">
-                                View all <ArrowRight size={13} />
-                            </Link>
-                        </div>
-                        <div className="adm-company-list">
-                            {pendingCompanies.map(c => (
-                                <div key={c.name} className="adm-company-item">
-                                    <div className="adm-company-logo">{c.initial}</div>
-                                    <div className="adm-company-info">
-                                        <span className="fw-medium">{c.name}</span>
-                                        <span className="text-muted">{c.sector} · {c.wilaya}</span>
-                                        <span className="text-muted small">{c.registered}</span>
-                                    </div>
-                                    <div className="adm-actions">
-                                        <button className="adm-action-btn approve sm">Approve</button>
-                                        <button className="adm-action-btn reject sm">Reject</button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                </div>
-            </div>
-
-            {/* ══ ROW 2: Recent Applications + Activity Feed ══ */}
-            <div className="adm-row adm-row-mt">
-
-                {/* ── RECENT APPLICATIONS ── */}
-                <section className="adm-card">
-                    <div className="adm-card-head">
-                        <div>
-                            <h2>Recent Applications</h2>
-                            <p>Latest student submissions</p>
-                        </div>
-                        <Link to="/admin/applications" className="adm-btn-link">
-                            View all <ArrowRight size={13} />
-                        </Link>
-                    </div>
-                    <div className="adm-table-wrap">
-                        <table className="adm-table">
-                            <thead>
-                                <tr>
-                                    <th>Student</th>
-                                    <th>Company</th>
-                                    <th>Role</th>
-                                    <th>Date</th>
-                                    <th>Status</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {recentApplications.map(a => {
-                                    const cfg = appStatusCfg[a.status];
-                                    return (
-                                        <tr key={a.id}>
-                                            <td>
-                                                <div className="adm-student-cell">
-                                                    <div className="adm-student-avatar">
-                                                        {a.student.split(' ').map(w => w[0]).join('').slice(0, 2)}
-                                                    </div>
-                                                    <div>
-                                                        <div className="fw-medium">{a.student}</div>
-                                                        <div className="adm-cell-sub">{a.level}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="fw-medium">{a.company}</td>
-                                            <td className="text-muted">{a.role}</td>
-                                            <td className="text-muted">{a.date}</td>
-                                            <td>
-                                                <span className={`app-status-badge ${cfg.cls}`}>
-                                                    {cfg.label}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <Link to="/admin/applications" className="adm-action-icon" title="View application">
-                                                    <Eye size={13} />
-                                                </Link>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                {/* ── ACTIVITY FEED ── */}
-                <div className="adm-col-right">
-                    <section className="adm-card">
-                        <div className="adm-card-head">
-                            <div>
-                                <h2>Activity Feed</h2>
-                                <p>Recent system events</p>
-                            </div>
-                            <Activity size={15} style={{ color: 'var(--text-muted)' }} />
-                        </div>
-                        <div className="adm-activity-list">
-                            {activityFeed.map((item, i) => (
-                                <div key={i} className="adm-activity-item">
-                                    <div className={`adm-act-icon ${item.color}`}>
-                                        <item.icon size={13} />
-                                    </div>
-                                    <div className="adm-act-body">
-                                        <span className="adm-act-text">{item.text}</span>
-                                        <span className="adm-act-sub">{item.sub}</span>
-                                    </div>
-                                    <span className="adm-act-time">{item.time}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-
-                    {/* QUICK LINKS */}
-                    <section className="adm-card">
-                        <div className="adm-card-head">
-                            <div><h2>Quick Links</h2></div>
-                        </div>
-                        <div className="adm-quick-links">
-                            {[
-                                { to: '/admin/offers', icon: Briefcase, label: 'Validate Offers', count: '14 pending' },
-                                { to: '/admin/applications', icon: FileText, label: 'Review Applications', count: '87 active' },
-                                { to: '/admin/conventions', icon: CheckSquare, label: 'Manage Conventions', count: '3 in progress' },
-                                { to: '/admin/students', icon: GraduationCap, label: 'Browse Students', count: '1,204 total' },
-                                { to: '/admin/companies', icon: Building2, label: 'Partner Companies', count: '2 awaiting' },
-                            ].map(l => (
-                                <Link key={l.to} to={l.to} className="adm-quick-link">
-                                    <div className="adm-ql-icon"><l.icon size={15} /></div>
-                                    <div className="adm-ql-text">
-                                        <span>{l.label}</span>
-                                        <span className="adm-ql-count">{l.count}</span>
-                                    </div>
-                                    <ArrowRight size={13} className="adm-ql-arrow" />
-                                </Link>
-                            ))}
-                        </div>
-                    </section>
-                </div>
-            </div>
-
-        </DashboardLayout>
+      <DashboardLayout pageTitle="Dashboard">
+        <p style={{ padding: 24 }}>Loading…</p>
+      </DashboardLayout>
     );
+  }
+
+  /* ── derived stat cards ── */
+  const statCards = [
+    { label: "Applications (total)", value: app?.total ?? "—", delta: "All time", up: true, icon: FileText, color: "stat-blue" },
+    { label: "Pending", value: app?.pending ?? "—", delta: "Awaiting review", up: false, icon: Clock, color: "stat-amber" },
+    { label: "Accepted", value: app?.accepted ?? "—", delta: "By companies", up: true, icon: CheckSquare, color: "stat-teal" },
+    { label: "Refused", value: app?.refused ?? "—", delta: "By companies", up: false, icon: Briefcase, color: "stat-red" },
+    { label: "Validated", value: app?.validated ?? "—", delta: "Admin validated", up: true, icon: Activity, color: "stat-green" },
+    { label: "Students (scoped)", value: stud?.total ?? "—", delta: "Active this scope", up: true, icon: Users, color: "stat-purple" },
+  ];
+
+  return (
+    <DashboardLayout pageTitle="Dashboard">
+
+      {/* Scope label */}
+      {stats?.institution && (
+        <p style={{ padding: "8px 0 0", color: "var(--sc-muted)", fontSize: 13 }}>
+          Scope: {stats.institution}
+        </p>
+      )}
+
+      {/* ── STAT GRID ── */}
+      <section className="adm-stat-grid">
+        {statCards.map((s) => (
+          <div key={s.label} className={`adm-stat-card ${s.color}`}>
+            <div className="adm-stat-icon"><s.icon size={18} /></div>
+            <div className="adm-stat-body">
+              <span className="adm-stat-label">{s.label}</span>
+              <span className="adm-stat-value">{s.value}</span>
+              <span className={`adm-stat-delta ${s.up ? "up" : "down"}`}>
+                <TrendingUp size={11} /> {s.delta}
+              </span>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* ══ ROW 1: Pending validations (wide) + Conventions ══ */}
+      <div className="adm-row">
+
+        {/* ── PENDING INTERNSHIP VALIDATION TABLE ── */}
+        <section className="adm-card">
+          <div className="adm-card-head">
+            <div>
+              <h2>Pending Internship Validation</h2>
+              <p>Accepted applications awaiting administration ({pending.length})</p>
+            </div>
+            <Link to="/administration/applications" className="adm-btn-link">
+              View all <ArrowRight size={13} />
+            </Link>
+          </div>
+          <div className="adm-table-wrap">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Offer</th>
+                  <th>Company</th>
+                  <th>Town</th>
+                  <th>Date</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.slice(0, 12).map((row) => (
+                  <tr key={row.application_id}>
+                    <td>
+                      <div className="adm-student-cell">
+                        <div className="adm-student-avatar">
+                          {row.student_name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="fw-medium">{row.student_name}</div>
+                          {row.speciality && <div className="adm-cell-sub">{row.speciality}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td>{row.offer_title}</td>
+                    <td className="fw-medium">{row.company_name}</td>
+                    <td className="text-muted">{row.offer_town ?? "—"}</td>
+                    <td className="text-muted">
+                      {row.application_date ? String(row.application_date).slice(0, 10) : "—"}
+                    </td>
+                    <td>
+                      <Link to="/administration/applications" className="adm-action-icon" title="View">
+                        <Eye size={14} />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {pending.length === 0 && (
+              <p className="text-muted" style={{ padding: 16 }}>No pending validations.</p>
+            )}
+          </div>
+        </section>
+
+        {/* ── RIGHT COLUMN ── */}
+        <div className="adm-col-right">
+
+          {/* CONVENTIONS */}
+          <section className="adm-card">
+            <div className="adm-card-head">
+              <div>
+                <h2>Conventions</h2>
+                <p>Awaiting administration signature ({conventions.length})</p>
+              </div>
+              <Link to="/administration/conventions" className="adm-btn-link">
+                View all <ArrowRight size={13} />
+              </Link>
+            </div>
+            <div className="adm-conv-list">
+              {conventions.slice(0, 8).map((c) => {
+                const cfg = convStatusCfg[c.status] ?? { cls: "cs-generated", label: c.status };
+                return (
+                  <div key={c.id} className="adm-conv-item">
+                    <div className="adm-conv-meta">
+                      <span className="adm-conv-id">#{c.id}</span>
+                      <span className={`cv-status-badge ${cfg.cls}`} style={{ fontSize: 10 }}>
+                        {cfg.label}
+                      </span>
+                    </div>
+                    <p className="adm-conv-names">
+                      {c.student_name} <span>→</span> {c.company_name}
+                    </p>
+                    <div className="adm-conv-foot">
+                      <p className="text-muted small">{c.offer_title}</p>
+                      <button className="adm-action-icon" title="Download PDF">
+                        <Download size={13} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {conventions.length === 0 && (
+                <p className="text-muted small" style={{ padding: 8 }}>None pending.</p>
+              )}
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      {/* ══ ROW 2: Performance strip + Quick links ══ */}
+      <div className="adm-row adm-row-mt">
+
+        {/* ── PLACEMENT PERFORMANCE ── */}
+        <section className="adm-card adm-perf-card-dash">
+          <div className="adm-card-head">
+            <div>
+              <h2>Placement Overview</h2>
+              <p>Student internship placement rate</p>
+            </div>
+            <span className="adm-year-badge">
+              <Activity size={11} /> {stats?.period ?? new Date().getFullYear()}
+            </span>
+          </div>
+
+          <div className="adm-perf-list">
+            {[
+              { label: "Applications submitted", value: app?.total ?? 0, max: app?.total || 1, color: "#63a4f2" },
+              { label: "Accepted by companies", value: app?.accepted ?? 0, max: app?.total || 1, color: "#4ade80" },
+              { label: "Validated by admin", value: app?.validated ?? 0, max: app?.accepted || 1, color: "#f57da9" },
+              { label: "Students placed", value: stud?.placed ?? 0, max: stud?.total || 1, color: "#a78bfa" },
+            ].map((item) => (
+              <div key={item.label} className="adm-perf-item">
+                <div className="adm-perf-top">
+                  <span className="adm-perf-label">{item.label}</span>
+                  <span className="adm-perf-value">{item.value}</span>
+                </div>
+                <div className="adm-perf-track">
+                  <div
+                    className="adm-perf-fill"
+                    style={{ width: `${Math.min(100, Math.round(((item.value as number) / (item.max as number)) * 100))}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="adm-perf-strip">
+            {[
+              { val: app?.total ?? "—", lbl: "Total" },
+              { val: app?.pending ?? "—", lbl: "Pending" },
+              { val: app?.accepted ?? "—", lbl: "Accepted" },
+              { val: app?.validated ?? "—", lbl: "Validated" },
+            ].map((s) => (
+              <div key={s.lbl} className="adm-perf-strip-item">
+                <span className="adm-perf-strip-val">{s.val}</span>
+                <span className="adm-perf-strip-lbl">{s.lbl}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── QUICK LINKS ── */}
+        <div className="adm-col-right">
+          <section className="adm-card">
+            <div className="adm-card-head">
+              <div><h2>Quick Links</h2></div>
+            </div>
+            <div className="adm-quick-links">
+              {[
+                { to: "/administration/offers", icon: Briefcase, label: "Open internship offers", count: `${app?.pending ?? 0} pending` },
+                { to: "/administration/applications", icon: FileText, label: "Applications", count: `${app?.total ?? 0} total` },
+                { to: "/administration/conventions", icon: CheckSquare, label: "Conventions", count: `${conventions.length} pending` },
+                { to: "/administration/students", icon: GraduationCap, label: "Students", count: `${stud?.total ?? 0} total` },
+                { to: "/administration/companies", icon: Building2, label: "Companies", count: `${stud?.placed ?? 0} placed` },
+              ].map((l) => (
+                <Link key={l.to} to={l.to} className="adm-quick-link">
+                  <div className="adm-ql-icon"><l.icon size={15} /></div>
+                  <div className="adm-ql-text">
+                    <span>{l.label}</span>
+                    <span className="adm-ql-count">{l.count}</span>
+                  </div>
+                  <ArrowRight size={13} className="adm-ql-arrow" />
+                </Link>
+              ))}
+            </div>
+          </section>
+        </div>
+
+      </div>
+
+    </DashboardLayout>
+  );
 };
 
 export default AdminDashboard;

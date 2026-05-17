@@ -1,7 +1,7 @@
 // AdminEmails.tsx
 import { useState, useEffect } from "react";
-
-const API = "http://localhost:8000/api";
+import api from "../api";
+import toast from "react-hot-toast";
 
 interface WhitelistedEmail {
   id: number;
@@ -30,32 +30,20 @@ export default function AdminEmails() {
   const fetchEmails = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/admin/administration-emails/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data.error && Array.isArray(data.data)) {
-        setEmails(data.data);
-      } else {
-        setEmails(getMockEmails());
+      const { data } = await api.get("admin/administration-emails/");
+      const body = data as { error?: boolean; data?: WhitelistedEmail[] };
+      if (!body.error && Array.isArray(body.data)) setEmails(body.data);
+      else {
+        setEmails([]);
+        toast.error("Could not load whitelist.");
       }
     } catch {
-      setEmails(getMockEmails());
+      setEmails([]);
+      toast.error("Could not load whitelist.");
     } finally {
       setLoading(false);
     }
   };
-
-  const getMockEmails = (): WhitelistedEmail[] => [
-    { id: 1, email: "chef.stage@univ-constantine1.dz", domain: "univ-constantine1.dz", institution: "Université Frères Mentouri Constantine 1", created_at: "2026-01-15", is_registered: true },
-    { id: 2, email: "stages@usthb.dz", domain: "usthb.dz", institution: "USTHB - Alger", created_at: "2026-01-15", is_registered: false },
-    { id: 3, email: "admin.stages@esi.dz", domain: "esi.dz", institution: "École Supérieure d'Informatique - Alger", created_at: "2026-01-20", is_registered: true },
-    { id: 4, email: "chef.stage@univ-setif.dz", domain: "univ-setif.dz", institution: "Université de Sétif", created_at: "2026-02-01", is_registered: false },
-    { id: 5, email: "stages@univ-bejaia.dz", domain: "univ-bejaia.dz", institution: "Université de Béjaïa", created_at: "2026-02-10", is_registered: false },
-    { id: 6, email: "admin@univ-oran1.dz", domain: "univ-oran1.dz", institution: "Université d'Oran 1", created_at: "2026-03-01", is_registered: false },
-    { id: 7, email: "stages@ummto.dz", domain: "ummto.dz", institution: "Université Mouloud Mammeri - Tizi Ouzou", created_at: "2026-03-15", is_registered: true },
-  ];
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,44 +58,26 @@ export default function AdminEmails() {
     }
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/admin/administration-emails/add/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email: newEmail.toLowerCase().trim(), institution: newInstitution.trim() }),
+      const { data } = await api.post("admin/administration-emails/add/", {
+        email: newEmail.toLowerCase().trim(),
+        institution: newInstitution.trim(),
       });
-      const data = await res.json();
-      if (!data.error) {
-        setEmails(prev => [...prev, {
-          id: Date.now(),
-          email: newEmail.toLowerCase().trim(),
-          domain: newEmail.split("@")[1],
-          institution: newInstitution.trim(),
-          created_at: new Date().toISOString().split("T")[0],
-          is_registered: false,
-        }]);
+      const body = data as { error?: boolean; message?: string; data?: WhitelistedEmail };
+      if (!body.error) {
+        await fetchEmails();
         setNewEmail("");
         setNewInstitution("");
         setShowAddForm(false);
-        setSuccessMsg(data.message || "Email domain added successfully!");
+        setSuccessMsg(body.message || "Email domain added successfully!");
+        toast.success("Added.");
         setTimeout(() => setSuccessMsg(""), 4000);
       } else {
-        setErrorMsg(data.message || "Failed to add email.");
+        setErrorMsg(body.message || "Failed to add email.");
+        toast.error(body.message || "Failed to add email.");
       }
     } catch {
-      // Add locally
-      setEmails(prev => [...prev, {
-        id: Date.now(),
-        email: newEmail.toLowerCase().trim(),
-        domain: newEmail.split("@")[1],
-        institution: newInstitution.trim(),
-        created_at: new Date().toISOString().split("T")[0],
-        is_registered: false,
-      }]);
-      setNewEmail(""); setNewInstitution("");
-      setShowAddForm(false);
-      setSuccessMsg("Email domain added successfully!");
-      setTimeout(() => setSuccessMsg(""), 3000);
+      setErrorMsg("Failed to add email.");
+      toast.error("Failed to add email.");
     } finally {
       setSubmitting(false);
     }
@@ -115,18 +85,15 @@ export default function AdminEmails() {
 
   const handleDelete = async (id: number) => {
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/admin/administration-emails/${id}/delete/`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setSuccessMsg(data.message || "Email domain removed.");
+      const { data } = await api.delete(`admin/administration-emails/${id}/delete/`);
+      const body = data as { message?: string };
+      setSuccessMsg(body.message || "Email domain removed.");
+      toast.success("Removed.");
+      setEmails((prev) => prev.filter((e) => e.id !== id));
+      setDeleteConfirm(null);
     } catch {
-      setSuccessMsg("Email domain removed.");
+      toast.error("Delete failed.");
     }
-    setEmails(prev => prev.filter(e => e.id !== id));
-    setDeleteConfirm(null);
     setTimeout(() => setSuccessMsg(""), 3000);
   };
 
@@ -156,7 +123,7 @@ export default function AdminEmails() {
 
       {/* Info Banner */}
       <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "1rem 1.25rem", display: "flex", gap: ".875rem", alignItems: "flex-start" }}>
-        <span style={{ fontSize: "1.2rem", flexShrink: 0 }}>ℹ️</span>
+        <span style={{ fontSize: "1.2rem", flexShrink: 0 }}>ℹï¸</span>
         <div style={{ fontSize: ".8rem", color: "#0369a1", lineHeight: 1.6 }}>
           <strong>How this works:</strong> You register the <em>exact email address</em> of each university's administration officer.
           Only that specific email can register with the <strong>administration</strong> role.

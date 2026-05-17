@@ -1,4 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import api from '../api';
 import DashboardLayout from '../components/DashboardLayout';
 import {
     Download, Eye, Search, X,
@@ -40,78 +42,50 @@ interface Convention {
     articleCount: number;
     supervisorName: string;
     supervisorTitle: string;
+    /** Present when backed by Django `Convention` pk (pending admin workflow). */
+    apiId?: number;
+}
+
+/** Row from GET /api/conventions/pending-admin/ */
+type PendingConventionApiRow = {
+    id: number;
+    student_name: string;
+    student_email: string;
+    company_name: string;
+    offer_title: string;
+    offer_town: string;
+    created_at: string;
+    updated_at: string;
+};
+
+/** Map Django pending conventions into the drawer/list shape used here. */
+function mapPendingConventionRow(row: PendingConventionApiRow): Convention {
+    return {
+        id: `CV-${String(row.id).padStart(4, '0')}`,
+        apiId: row.id,
+        student: row.student_name,
+        studentLevel: '—',
+        studentEmail: row.student_email,
+        company: row.company_name,
+        companyWilaya: row.offer_town,
+        role: row.offer_title,
+        domain: '',
+        startDate: '—',
+        endDate: '—',
+        duration: '',
+        /** Company signed → waiting administration (`PENDING_ADMIN` on backend). */
+        status: 'signed_company',
+        generatedAt: row.created_at,
+        lastUpdate: row.updated_at,
+        articleCount: 0,
+        supervisorName: '',
+        supervisorTitle: '',
+    };
 }
 
 /* ══════════════════════════════════════════════════════════════
-   MOCK DATA  (replace with API call later)
+   CONFIG
    ══════════════════════════════════════════════════════════════ */
-
-const MOCK_CONVENTIONS: Convention[] = [
-    {
-        id: 'CV-2026-081', student: 'Benali Ahmed', studentLevel: 'L3 Informatique',
-        studentEmail: 'a.benali@ufmc1.dz', company: 'Condor Electronics',
-        companyWilaya: 'B.B. Arréridj', role: 'Embedded Systems Intern',
-        domain: 'Électronique', startDate: '01 Juin 2026', endDate: '31 Juil 2026',
-        duration: '2 mois', status: 'stamped', generatedAt: '22 Avr 2026',
-        lastUpdate: '28 Avr 2026', articleCount: 5,
-        supervisorName: 'Dr. Khelifa Mourad', supervisorTitle: 'Maître de conférences',
-    },
-    {
-        id: 'CV-2026-080', student: 'Kerboua Lyna', studentLevel: 'M1 Réseaux',
-        studentEmail: 'l.kerboua@ufmc1.dz', company: 'Sonatrach',
-        companyWilaya: 'Hassi Messaoud', role: 'Network Engineering Intern',
-        domain: 'Télécom', startDate: '15 Mai 2026', endDate: '15 Août 2026',
-        duration: '3 mois', status: 'complete', generatedAt: '18 Avr 2026',
-        lastUpdate: '26 Avr 2026', articleCount: 5,
-        supervisorName: 'Dr. Bouzid Sara', supervisorTitle: 'Professeure',
-    },
-    {
-        id: 'CV-2026-079', student: 'Mounir Samir', studentLevel: 'L3 Informatique',
-        studentEmail: 's.mounir@ufmc1.dz', company: 'Mobilis',
-        companyWilaya: 'Constantine', role: 'Mobile Dev Intern',
-        domain: 'Informatique', startDate: '01 Juin 2026', endDate: '31 Août 2026',
-        duration: '3 mois', status: 'signed_student', generatedAt: '20 Avr 2026',
-        lastUpdate: '25 Avr 2026', articleCount: 5,
-        supervisorName: 'Dr. Khelifa Mourad', supervisorTitle: 'Maître de conférences',
-    },
-    {
-        id: 'CV-2026-078', student: 'Rahmani Yasmine', studentLevel: 'M2 Sécurité',
-        studentEmail: 'y.rahmani@ufmc1.dz', company: 'Algérie Télécom',
-        companyWilaya: 'Sétif', role: 'Cybersecurity Intern',
-        domain: 'Sécurité', startDate: '01 Juil 2026', endDate: '30 Sep 2026',
-        duration: '3 mois', status: 'sent_student', generatedAt: '24 Avr 2026',
-        lastUpdate: '24 Avr 2026', articleCount: 5,
-        supervisorName: 'Pr. Amara Rachid', supervisorTitle: 'Professeur',
-    },
-    {
-        id: 'CV-2026-077', student: 'Tebbal Omar', studentLevel: 'L3 Électronique',
-        studentEmail: 'o.tebbal@ufmc1.dz', company: 'Cevital Group',
-        companyWilaya: 'Béjaïa', role: 'Industrial Automation Intern',
-        domain: 'Électronique', startDate: '15 Juin 2026', endDate: '15 Août 2026',
-        duration: '2 mois', status: 'signed_company', generatedAt: '19 Avr 2026',
-        lastUpdate: '23 Avr 2026', articleCount: 5,
-        supervisorName: 'Dr. Bouzid Sara', supervisorTitle: 'Professeure',
-    },
-    {
-        id: 'CV-2026-076', student: 'Hadj Ali Rania', studentLevel: 'M1 Informatique',
-        studentEmail: 'r.hadjali@ufmc1.dz', company: 'Ooredoo Algeria',
-        companyWilaya: 'Alger', role: 'Software Engineering Intern',
-        domain: 'Informatique', startDate: '01 Mai 2026', endDate: '31 Juil 2026',
-        duration: '3 mois', status: 'generated', generatedAt: '27 Avr 2026',
-        lastUpdate: '27 Avr 2026', articleCount: 5,
-        supervisorName: 'Pr. Amara Rachid', supervisorTitle: 'Professeur',
-    },
-    {
-        id: 'CV-2026-075', student: 'Bensalem Amine', studentLevel: 'L3 Informatique',
-        studentEmail: 'a.bensalem@ufmc1.dz', company: 'Air Algérie',
-        companyWilaya: 'Alger', role: 'IT Systems Intern',
-        domain: 'Informatique', startDate: '01 Mar 2026', endDate: '31 Mar 2026',
-        duration: '1 mois', status: 'expired', generatedAt: '10 Fév 2026',
-        lastUpdate: '01 Mar 2026', articleCount: 5,
-        supervisorName: 'Dr. Khelifa Mourad', supervisorTitle: 'Maître de conférences',
-    },
-];
-
 
 const STATUS_CONFIG: Record<ConvStatus, {
     label: string; shortLabel: string; cls: string;
@@ -153,6 +127,9 @@ const nextStepLabel = (status: ConvStatus): string | null => {
     return STATUS_CONFIG[PIPELINE[idx + 1]].label;
 };
 
+/* ══════════════════════════════════════════════════════════════
+   SUB-COMPONENTS
+   ══════════════════════════════════════════════════════════════ */
 
 /* ── Mini pipeline dots shown on each card ── */
 const MiniPipeline: React.FC<{ status: ConvStatus }> = ({ status }) => {
@@ -264,7 +241,6 @@ const ConventionDrawer: React.FC<{
     const next = nextStepLabel(c.status);
     const canAdvance = c.status !== 'complete' && c.status !== 'expired';
 
-    // Reset confirm whenever a different convention is opened
     React.useEffect(() => { setConfirmOpen(false); }, [c.id]);
 
     return (
@@ -390,13 +366,39 @@ const ConventionDrawer: React.FC<{
     );
 };
 
+/* ══════════════════════════════════════════════════════════════
+   MAIN PAGE
+   ══════════════════════════════════════════════════════════════ */
 
 const ConventionsPage: React.FC = () => {
-    const [conventions, setConventions] = useState<Convention[]>(MOCK_CONVENTIONS);
+    const [conventions, setConventions] = useState<Convention[]>([]);
     const [activeTab, setActiveTab] = useState<Tab>('Active');
     const [search, setSearch] = useState('');
     const [selected, setSelected] = useState<Convention | null>(null);
     const [advancing, setAdvancing] = useState(false);
+
+    /* ── Load from API ── */
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await api.get<{ error?: boolean; data?: PendingConventionApiRow[] }>(
+                    'conventions/pending-admin/'
+                );
+                const rows =
+                    res.data?.error === true
+                        ? []
+                        : (res.data?.data as PendingConventionApiRow[] | undefined) ?? [];
+                if (!cancelled) setConventions(rows.map(mapPendingConventionRow));
+            } catch {
+                if (!cancelled) {
+                    toast.error('Could not load pending conventions.');
+                    setConventions([]);
+                }
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     /* ── Filtered list ── */
     const filtered = useMemo(() =>
@@ -413,24 +415,30 @@ const ConventionsPage: React.FC = () => {
 
     const tabCount = (tab: Tab) => conventions.filter(c => tabMatch(tab, c.status)).length;
 
-    /* ── Advance pipeline status ── */
-    const handleAdvance = () => {
+    /* ── Advance pipeline status via API ── */
+    const handleAdvance = async () => {
         if (!selected) return;
-        setAdvancing(true);
 
-        // Simulate async (swap for real API call later)
-        setTimeout(() => {
-            setConventions(prev => prev.map(c => {
-                if (c.id !== selected.id) return c;
-                const idx = PIPELINE.indexOf(c.status);
-                if (idx === -1 || idx >= PIPELINE.length - 1) return c;
-                return { ...c, status: PIPELINE[idx + 1], lastUpdate: '28 Avr 2026' };
-            }));
+        const apiPk = typeof selected.apiId === 'number' ? selected.apiId : null;
+        if (apiPk == null) {
+            toast.error('This convention row is missing a server id.');
+            return;
+        }
+
+        setAdvancing(true);
+        try {
+            await api.post(`conventions/${apiPk}/sign/`);
+            toast.success('Convention validated by administration.');
+            setConventions(prev => prev.filter(c => c.id !== selected.id));
+            setSelected(null);
+        } catch {
+            toast.error('Unable to validate convention.');
+        } finally {
             setAdvancing(false);
-        }, 600);
+        }
     };
 
-    // Keep drawer in sync after status update
+    /* ── Keep drawer in sync after status update ── */
     React.useEffect(() => {
         if (!selected) return;
         const updated = conventions.find(c => c.id === selected.id);
@@ -438,8 +446,8 @@ const ConventionsPage: React.FC = () => {
     }, [conventions]);
 
     return (
-        <DashboardLayout pageTitle="Conventions"
-        >
+        <DashboardLayout pageTitle="Conventions">
+
             {/* ── Status summary strip ── */}
             <div className="cv-summary-strip">
                 {(Object.keys(STATUS_CONFIG) as ConvStatus[])
@@ -519,12 +527,13 @@ const ConventionsPage: React.FC = () => {
                             key={selected.id}
                             convention={selected}
                             onClose={() => setSelected(null)}
-                            onAdvance={handleAdvance}
+                            onAdvance={() => void handleAdvance()}
                             advancing={advancing}
                         />
                     )}
                 </AnimatePresence>
             </div>
+
         </DashboardLayout>
     );
 };
