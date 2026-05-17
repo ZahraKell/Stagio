@@ -25,10 +25,10 @@ const ROLE_LABEL: Record<string, string> = {
   administration: "Administration",
 };
 const ROLE_COLOR: Record<string, string> = {
-  student: "#a855f7",
+  student: "#d7e44f",
   company: "#f59e0b",
-  admin: "#ef4444",
-  administration: "#3b82f6",
+  admin: "#3532e7",
+  administration: "#4f4023",
 };
 
 const PICTURE_KEY = "profile_picture_url";
@@ -103,7 +103,11 @@ export default function Header() {
     <nav className={`hs-nav ${isScrolled ? "hs-nav-scrolled" : ""}`}>
       <div className="hs-nav-left">
         <Link to="/" className="hs-logo">
-          Stag<span style={{ color: isScrolled ? "#000" : "#F5C518" }}>.io</span>
+            <img
+    src={isScrolled ? "/src/assets/logo-removed.png" : "/src/assets/logo-w-removed.png"}
+    alt="InternChips"
+    style={{ height: isScrolled ? "55px" : "70px", objectFit: "contain", transition: "opacity 0.3s ease" }}
+  /> 
         </Link>
         <ul className="hs-nav-links">
           <li><Link to="/offers">Offers</Link></li>
@@ -171,7 +175,11 @@ export default function Header() {
           </div>
         ) : (
           /* ── LOGGED OUT ──────────────────────────────────────────────────── */
-          <Link to="/login" className="hs-login-btn">
+          <Link to="/login" className="hs-login-btn"   style={{
+    color: isScrolled ? "#000" : "#fff",
+    borderColor: isScrolled ? "#000" : "#fff",
+    transition: "color 0.3s ease, border-color 0.3s ease"
+  }}>
             <LogIn size={16} /><span>Login</span>
           </Link>
         )}

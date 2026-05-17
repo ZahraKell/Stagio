@@ -342,8 +342,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="sc-brand">
-            <span className="sc-brand-icon">S</span>
-            <span className="sc-brand-name">StageConnect</span>
+            <span className="sc-brand-name"><img src="/src/assets/internS.png" alt="InternChips" style={{ height: "100px", objectFit: "contain" }} /></span>
           </div>
         </div>
 
@@ -456,7 +455,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             data-role={role}
           >
             <div className="sc-sidebar-logo">
-              <h2>StageConnect</h2>
+              <h2>InternChips</h2>
               <p>{brandSubtitle}</p>
             </div>
             <nav className="sc-sidebar-menu">

@@ -249,7 +249,7 @@ export default function CompanyHome() {
           <div className="ch-greet-text">
             <h2 className="ch-greeting">{greeting}, <strong>{fullName}</strong> 👋</h2>
             <p className="ch-greet-sub">
-              Voici un aperçu de votre activité de recrutement sur Stag.io
+              Voici un aperçu de votre activité de recrutement sur InternChips
             </p>
           </div>
           <Link to="/company/offers/new" className="ch-new-btn">

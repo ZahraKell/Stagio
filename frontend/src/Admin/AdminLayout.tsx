@@ -84,9 +84,9 @@ export default function AdminLayout() {
       {/* Sidebar */}
       <aside className="am-sidebar">
         <div className="am-brand" onClick={() => navigate("/admin/dashboard")}>
-          <div className="am-brand-logo">SC</div>
+          <div className="am-brand-logo">IC</div>
           <div>
-            <div className="am-brand-title">StageConnect</div>
+            <div className="am-brand-title">InternChips</div>
             <div className="am-brand-sub">Admin Portal</div>
           </div>
         </div>

@@ -158,9 +158,9 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
 
         {/* Brand */}
         <div className="cl-brand">
-          <span className="cl-brand-logo">S</span>
+          <span className="cl-brand-logo">I</span>
           <div>
-            <p className="cl-brand-title">Stag<em>.io</em></p>
+            <p className="cl-brand-title">Intern<em>Chips</em></p>
             <p className="cl-brand-sub">Espace Entreprise</p>
           </div>
         </div>
