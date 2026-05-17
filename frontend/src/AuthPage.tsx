@@ -151,7 +151,7 @@ export default function AuthPage() {
       const autoUsername =
         formData.email.split("@")[0] + "_" + Date.now().toString().slice(-4);
 
-      await api.post(`${API}/api/auth/register/`, {
+      await api.post("auth/register/", {
         username: autoUsername,
         email: formData.email,
         password: formData.password,
