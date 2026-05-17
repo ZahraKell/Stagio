@@ -1,5 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import soulef from "./assets/soulef.jpg";
+import zahra from "./assets/zahra.jpg";
 
 const AboutPage: React.FC = () => {
     return (
@@ -48,25 +50,16 @@ const AboutPage: React.FC = () => {
                 <h2>Meet Our Team</h2>
                 <div className="team-grid">
                     <div className="team-card">
-                        <img src="https://randomuser.me/api/portraits/women/68.jpg" alt="Team member" />
-                        <h4>Sarah Ahmed</h4>
-                        <p>CEO & Founder</p>
+                        <img src={soulef} alt="Team member" />
+                        <h4>Bendjamaa Soulef Hadil</h4>
+                        <p>CEO & Founder <br />Developer</p>
                     </div>
                     <div className="team-card">
-                        <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Team member" />
-                        <h4>Karim Benali</h4>
-                        <p>CTO</p>
+                        <img src={zahra} alt="Team member" />
+                        <h4>Kellou Fatima Zahra</h4>
+                        <p>CEO & Founder <br />Developer</p>
                     </div>
-                    <div className="team-card">
-                        <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="Team member" />
-                        <h4>Leila Mansouri</h4>
-                        <p>Head of Partnerships</p>
-                    </div>
-                    <div className="team-card">
-                        <img src="https://randomuser.me/api/portraits/men/75.jpg" alt="Team member" />
-                        <h4>Mehdi Kaci</h4>
-                        <p>Lead Developer</p>
-                    </div>
+
                 </div>
             </div>
 
