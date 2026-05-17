@@ -1,6 +1,7 @@
 // src/components/DashboardLayout.tsx
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import logointern from "../assets/internS.png";
 import {
   Home,
   Briefcase,
@@ -342,7 +343,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="sc-brand">
-            <span className="sc-brand-name"><img src="/src/assets/internS.png" alt="InternChips" style={{ height: "100px", objectFit: "contain" }} /></span>
+            <span className="sc-brand-name"><img src={logointern} alt="InternChips" style={{ height: "100px", objectFit: "contain" }} /></span>
           </div>
         </div>
 
