@@ -5,7 +5,7 @@ import CompanyRegisterForm from "./components/CompanyRegisterForm";
 import api from "./api";
 import { login } from "./auth";
 
-const API = "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -50,7 +50,7 @@ export default function AuthPage() {
     localStorage.removeItem("google_signup_role");
 
     setGoogleLoading(true);
-    fetch("http://127.0.0.1:8000/api/auth/auth/google/", {
+    fetch(`${API}/api/auth/auth/google/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: idToken, role }),
@@ -151,7 +151,7 @@ export default function AuthPage() {
       const autoUsername =
         formData.email.split("@")[0] + "_" + Date.now().toString().slice(-4);
 
-      await api.post("auth/register/", {
+      await api.post(`${API}/api/auth/register/`, {
         username: autoUsername,
         email: formData.email,
         password: formData.password,
