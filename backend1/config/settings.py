@@ -172,13 +172,20 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # ── Email ──────────────────────────────────────────────────
-EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST          = config('EMAIL_HOST',     default='smtp.gmail.com')
-EMAIL_PORT          = config('EMAIL_PORT',     default=587, cast=int)
-EMAIL_USE_TLS       = True
-EMAIL_HOST_USER     = config('EMAIL_HOST_USER',     default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL  = config('DEFAULT_FROM_EMAIL',  default=EMAIL_HOST_USER)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST    = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT    = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+# Accept either env name (Railway guide used EMAIL_APP_PASSWORD in one place)
+_raw_email_password = config(
+    'EMAIL_HOST_PASSWORD',
+    default=config('EMAIL_APP_PASSWORD', default=''),
+)
+# Gmail app passwords are 16 chars; strip spaces if pasted with separators
+EMAIL_HOST_PASSWORD = _raw_email_password.replace(' ', '')
+# Gmail SMTP only reliably sends when From matches the authenticated mailbox
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'webmaster@localhost')
 
 # ── External APIs ──────────────────────────────────────────
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
