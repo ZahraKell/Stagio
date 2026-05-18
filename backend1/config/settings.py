@@ -1,21 +1,26 @@
 from pathlib import Path
-from decouple import config
 import os
+from decouple import config
+import dj_database_url
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY
-SECRET_KEY = config('SECRET_KEY')
-DEBUG = config('DEBUG', cast=bool)
-ALLOWED_HOSTS = []
+# ── Security ───────────────────────────────────────────────
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me')
+DEBUG      = config('DEBUG', default=False, cast=bool)
 
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1'
+).split(',')
+
+# ── Authentication backends ────────────────────────────────
 AUTHENTICATION_BACKENDS = [
     'users.backends.EmailOrUsernameBackend',
-    'django.contrib.auth.backends.ModelBackend',  # keep as fallback
+    'django.contrib.auth.backends.ModelBackend',
 ]
 
-# Application definition
+# ── Apps ───────────────────────────────────────────────────
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -28,18 +33,22 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
-    # My apps
+    'cloudinary',
+    'cloudinary_storage',
+    # Your apps
     'users',
     'offers',
     'applications.apps.ApplicationsConfig',
-    'conventions',
+    'conventions.apps.ConventionsConfig',
     'notifications',
-    
+    'courses',
 ]
 
+# ── Middleware ─────────────────────────────────────────────
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # ← added for static files
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -48,38 +57,40 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'config.urls'
-
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-            ],
-        },
-    },
-]
-
+ROOT_URLCONF     = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'
+AUTH_USER_MODEL  = 'users.CustomUser'
 
-# Database — PostgreSQL
+# ── Templates ──────────────────────────────────────────────
+TEMPLATES = [{
+    'BACKEND': 'django.template.backends.django.DjangoTemplates',
+    'DIRS': [],
+    'APP_DIRS': True,
+    'OPTIONS': {
+        'context_processors': [
+            'django.template.context_processors.request',
+            'django.contrib.auth.context_processors.auth',
+            'django.contrib.messages.context_processors.messages',
+        ],
+    },
+}]
+
+# ── Database ───────────────────────────────────────────────
+# Uses DATABASE_URL on Railway (PostgreSQL)
+# Falls back to local PostgreSQL for development
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST'),
-        'PORT': config('DB_PORT'),
-    }
+    'default': dj_database_url.config(
+        default=(
+            f"postgresql://{config('DB_USER', default='postgres')}:"
+            f"{config('DB_PASSWORD', default='postgres')}@"
+            f"{config('DB_HOST', default='localhost')}:"
+            f"{config('DB_PORT', default='5432')}/"
+            f"{config('DB_NAME', default='stagio_db')}"
+        )
+    )
 }
 
-# Password validation
+# ── Password validation ────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -87,23 +98,35 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internationalization
+# ── Internationalization ───────────────────────────────────
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I18N = True
-USE_TZ = True
+TIME_ZONE     = 'UTC'
+USE_I18N      = True
+USE_TZ        = True
 
-# Static files
-STATIC_URL = 'static/'
+# ── Static files ───────────────────────────────────────────
+STATIC_URL  = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Media files (CVs, logos, PDFs)
+# ── Media files ────────────────────────────────────────────
+# Local development: files stored in media/ folder
+# Production (Railway): files stored on Cloudinary
+if config('CLOUDINARY_CLOUD_NAME', default=''):
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME', default=''),
+        'API_KEY':    config('CLOUDINARY_API_KEY',    default=''),
+        'API_SECRET': config('CLOUDINARY_API_SECRET', default=''),
+    }
+else:
+    # Local development
+    MEDIA_URL  = '/media/'
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Custom user model
-AUTH_USER_MODEL = 'users.CustomUser'
-
-# REST Framework
+# ── REST Framework ─────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -113,19 +136,52 @@ REST_FRAMEWORK = {
     ),
 }
 
-# JWT
+# ── JWT ────────────────────────────────────────────────────
 from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'ACCESS_TOKEN_LIFETIME':  timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
+    'ROTATE_REFRESH_TOKENS':  True,
     'BLACKLIST_AFTER_ROTATION': True,
 }
 
-# CORS — allow frontend to talk to backend
-CORS_ALLOW_ALL_ORIGINS = True
+# ── CORS ───────────────────────────────────────────────────
+# In development allow all, in production allow only your Vercel URL
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = config(
+        'CORS_ALLOWED_ORIGINS',
+        default='http://localhost:5173'
+    ).split(',')
+    CORS_ALLOW_CREDENTIALS = True
 
-# Email backend (dev-safe default).
-# For production SMTP, replace this backend and set EMAIL_HOST/... env values.
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID')
+CORS_ALLOW_METHODS = [
+    'DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# ── Email ──────────────────────────────────────────────────
+EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST          = config('EMAIL_HOST',     default='smtp.gmail.com')
+EMAIL_PORT          = config('EMAIL_PORT',     default=587, cast=int)
+EMAIL_USE_TLS       = True
+EMAIL_HOST_USER     = config('EMAIL_HOST_USER',     default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL  = config('DEFAULT_FROM_EMAIL',  default=EMAIL_HOST_USER)
+
+# ── External APIs ──────────────────────────────────────────
+GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
+YOUTUBE_API_KEY  = config('YOUTUBE_API_KEY',  default='')
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

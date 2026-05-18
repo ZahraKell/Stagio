@@ -5,7 +5,7 @@ import CompanyRegisterForm from "./components/CompanyRegisterForm";
 import api from "./api";
 import { login } from "./auth";
 
-const API = "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -50,13 +50,10 @@ export default function AuthPage() {
     localStorage.removeItem("google_signup_role");
 
     setGoogleLoading(true);
-    fetch("http://127.0.0.1:8000/api/auth/auth/google/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: idToken, role }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
+// Uses api.ts — automatic, cleaner
+api.post("auth/auth/google/", { token: idToken, role })
+.then((res) => {
+    const data = res.data;   // axios puts JSON in res.data
         if (data.access) {
           localStorage.setItem("access_token", data.access);
           localStorage.setItem("refresh_token", data.refresh);
@@ -116,7 +113,7 @@ export default function AuthPage() {
     // This opens the full Google account picker page
     const params = new URLSearchParams({
       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-      redirect_uri: "http://localhost:5173/login",
+      redirect_uri: `${window.location.origin}/login`,
       response_type: "id_token",
       scope: "openid email profile",
       prompt: "select_account",

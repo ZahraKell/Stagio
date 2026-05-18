@@ -16,7 +16,7 @@ urlpatterns = [
     path('reset-password/',  views.reset_password),
 
     # ── Profile (GET + PATCH for all roles) ───────────────────────────────────
-    path('profile/',        profile_views.get_profile),
+    path('profile/',        profile_views.profile_me),
     path('profile/update/', profile_views.update_profile),
     path('company/complete-profile/', profile_views.complete_company_profile),
 

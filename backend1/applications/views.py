@@ -18,6 +18,7 @@ from .serializers  import (
 )
 from .permissions  import IsStudent, IsAdmin, IsApplicationOwner, IsOfferOwnerOrAdmin
 from notifications.models import Notification
+from conventions.models import Convention
 
 
 def ok(data=None, message="OK", http_status=status.HTTP_200_OK):
@@ -25,6 +26,25 @@ def ok(data=None, message="OK", http_status=status.HTTP_200_OK):
 
 def fail(message="Error", http_status=status.HTTP_400_BAD_REQUEST):
     return Response({"error": True, "message": message}, status=http_status)
+
+
+def ensure_company_is_approved(user):
+    if user.role != "company":
+        return None
+    company = getattr(user, "company", None)
+    if not company:
+        return fail("Company profile not found.", status.HTTP_404_NOT_FOUND)
+    if not company.is_approved:
+        return fail(
+            "Your company account is pending admin approval. You cannot modify data yet.",
+            status.HTTP_403_FORBIDDEN
+        )
+    return None
+def _get_convention(application):
+    try:
+        return application.convention
+    except Exception:
+        return None
 
 
 # ── VIEW 1: SUBMIT APPLICATION ─────────────────────────────────────────────────
@@ -141,6 +161,12 @@ class OfferApplicationsView(APIView):
         filter_status = request.query_params.get("status")
         applications  = Application.objects.filter(offer=offer).select_related(
             "student", "student__user", "offer"
+            ).prefetch_related(
+        "student__digital_cv",
+        "student__digital_cv__skills",
+        "student__digital_cv__educations",
+        "student__digital_cv__experiences",
+        "student__digital_cv__languages",
         ).order_by("-application_date")
         if filter_status:
             applications = applications.filter(status=filter_status.lower())
@@ -161,6 +187,9 @@ class ReviewApplicationView(APIView):
             Application.objects.select_related("offer", "offer__company", "student", "student__user"),
             pk=pk,
         )
+        company_gate = ensure_company_is_approved(request.user)
+        if company_gate:
+            return company_gate
         if not IsOfferOwnerOrAdmin().has_object_permission(request, self, application):
             return fail("Permission denied.", status.HTTP_403_FORBIDDEN)
 
@@ -243,6 +272,31 @@ def _get_course_suggestions(tech_topic):
 
     except Exception:
         return f"Cherchez des cours sur : {tech_topic}"
+
+
+# ── APPLICATIONS SCOPED TO UNIVERSITY (administration role) ─────────────────
+class AdministrationApplicationsListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != "administration":
+            return fail("Administration only.", status.HTTP_403_FORBIDDEN)
+        admin_email = request.user.email or ""
+        admin_domain = admin_email.split("@")[1].lower() if "@" in admin_email else ""
+        if not admin_domain:
+            return fail(
+                "Could not determine institution scope from your email.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+        from users.models import Student
+
+        scoped_ids = Student.objects.filter(
+            user__email__iendswith=f"@{admin_domain}"
+        ).values_list("id", flat=True)
+        applications = Application.objects.filter(student_id__in=scoped_ids).select_related(
+            "student", "student__user", "offer", "offer__company", "offer__company__user"
+        ).order_by("-application_date")
+        return ok(data=ApplicationListSerializer(applications, many=True).data)
 
 
 # ── VIEW 6: ADMIN LISTS ALL APPLICATIONS ──────────────────────────────────────
@@ -328,7 +382,7 @@ def validate_internship(request, pk):
     # Keep Convention and Application workflow aligned.
     try:
         from conventions.models import Convention
-        convention = getattr(application, 'convention', None)
+        convention = _get_convention(application)
         if convention:
             convention.status = Convention.Status.VALIDATED
             convention.admin_signed_at = timezone.now()
@@ -425,7 +479,7 @@ def _send_validation_email(application):
             to=[student_email],
         )
         # Generate and attach Convention PDF if available.
-        convention = getattr(application, 'convention', None)
+        convention = _get_convention(application)
         if convention:
             rel_path = generate_convention_pdf(convention)
             abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
@@ -480,7 +534,7 @@ def reject_internship(request, pk):
         return Response({'error': f"Status must be 'accepted'. Current: '{application.status}'."}, status=400)
 
     reason             = request.data.get('reason', 'No reason provided.')
-    application.status = Application.Status.PENDING
+    application.status = Application.Status.REFUSED
     application.save(update_fields=['status'])
 
     Notification.objects.create(
@@ -701,6 +755,26 @@ def company_stats(request):
         'validated': apps.filter(status=Application.Status.VALIDATED).count(),
     })
 
+def _compute_cv_score(student):
+    """Compute CV score dynamically — mirrors cv_score view logic."""
+    score = 0
+    if student.user.full_name: score += 10
+    if student.user.pnum:      score += 5
+    if student.institution:    score += 10
+    if student.grade:          score += 5
+    try:
+        cv = student.digital_cv
+        if cv.github or cv.linkedin or cv.portfolio: score += 10
+        if cv.description:   score += 5
+        if cv.educations.count() > 0:  score += 15
+        if cv.experiences.count() > 0: score += 15
+        skill_count = cv.skills.count()
+        if skill_count >= 3:   score += 20
+        elif skill_count > 0:  score += 10
+        if cv.languages.count() > 0: score += 5
+    except Exception:
+        pass
+    return min(score, 100)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -710,14 +784,24 @@ def company_recent(request):
     company = request.user.company
     recent = Application.objects.filter(
         offer__company=company
-    ).select_related('student__user', 'offer').order_by('-application_date')[:10]
+    ).select_related(
+        'student__user', 'offer',
+        'student__digital_cv',        # ← prefetch CV
+    ).prefetch_related(
+        'student__digital_cv__skills',      # ← prefetch skills count
+        'student__digital_cv__educations',  # ← prefetch edu count
+        'student__digital_cv__experiences', # ← prefetch exp count
+        'student__digital_cv__languages',   # ← prefetch lang count
+    ).order_by('-application_date')[:10]
+
     data = [{
-        'application_id': a.pk,
-        'student_name': a.student.user.full_name,
-        'offer_title': a.offer.title,
-        'status': a.status,
-        'stage_state': a.stage_state,
+        'application_id':   a.pk,
+        'student_name':     a.student.user.full_name,
+        'offer_title':      a.offer.title,
+        'status':           a.status,
+        'stage_state':      a.stage_state,
         'application_date': a.application_date.isoformat(),
+        'cv_score':         _compute_cv_score(a.student),  # ← computed live
     } for a in recent]
     return ok(data=data)
 
@@ -744,6 +828,33 @@ def company_actions(request):
     })
 
 
+def _company_intern_ui_stage(application, convention):
+    """Keys expected by the company My Interns UI."""
+    if application.stage_state == "completed":
+        return "completed"
+    if convention:
+        if (
+            convention.status == Convention.Status.PENDING_COMPANY
+            and not convention.company_signed_at
+        ):
+            return "convention_to_sign"
+        if convention.status == Convention.Status.PENDING_STUDENT:
+            return "pending_convention"
+        if convention.status == Convention.Status.PENDING_ADMIN:
+            return "convention_pending"
+        if convention.status == Convention.Status.VALIDATED:
+            return "ongoing"
+    if application.stage_state in (
+        "internship_in_progress",
+        "report_to_validate",
+        "report_validated",
+    ):
+        return "ongoing"
+    if application.status == Application.Status.VALIDATED:
+        return "ongoing"
+    return "pending_convention"
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_interns(request):
@@ -754,15 +865,23 @@ def my_interns(request):
         offer__company=company,
         status__in=[Application.Status.ACCEPTED, Application.Status.VALIDATED]
     ).select_related('student__user', 'offer').order_by('-application_date')
-    data = [{
-        'application_id': a.pk,
-        'student_id': a.student_id,
-        'student_name': a.student.user.full_name,
-        'offer_title': a.offer.title,
-        'status': a.status,
-        'stage_state': a.stage_state,
-        'report_file': a.report_file.url if a.report_file else None,
-    } for a in interns]
+    data = []
+    for a in interns:
+        conv = Convention.objects.filter(application=a).first()
+        data.append({
+            'application_id': a.pk,
+            'student_id': a.student_id,
+            'student_name': a.student.user.full_name,
+            'student_email': a.student.user.email,
+            'offer_title': a.offer.title,
+            'application_date': a.application_date.isoformat(),
+            'status': a.status,
+            'stage_state': a.stage_state,
+            'stage': _company_intern_ui_stage(a, conv),
+            'convention_id': conv.pk if conv else None,
+            'convention_status': conv.status if conv else None,
+            'report_file': a.report_file.url if a.report_file else None,
+        })
     return ok(data=data)
 
 
@@ -814,6 +933,9 @@ def _issue_attestation(application):
 def validate_report(request, pk):
     if request.user.role != 'company':
         return fail("Companies only.", status.HTTP_403_FORBIDDEN)
+    company_gate = ensure_company_is_approved(request.user)
+    if company_gate:
+        return company_gate
     application = get_object_or_404(
         Application.objects.select_related('offer__company__user', 'student__user'),
         pk=pk,
@@ -860,4 +982,60 @@ def issue_attestation(request, pk):
         recipient=application.offer.company.user,
         message=f"Administration issued attestation for intern {application.student.user.full_name}."
     )
+    _send_attestation_email(application)
     return ok(message="Attestation issued successfully.")
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def download_attestation(request, pk):
+    if request.user.role != 'student':
+        return fail("Students only.", status.HTTP_403_FORBIDDEN)
+    application = get_object_or_404(
+        Application.objects.select_related('student__user'),
+        pk=pk,
+        student=request.user.student,
+    )
+    if not application.attestation_file:
+        return fail("Attestation not yet issued.", status.HTTP_404_NOT_FOUND)
+
+    abs_path = application.attestation_file.path
+    if not os.path.exists(abs_path):
+        return fail("Attestation file not found on server.", status.HTTP_404_NOT_FOUND)
+
+    from django.http import FileResponse
+    return FileResponse(
+        open(abs_path, "rb"),
+        content_type="application/pdf",
+        as_attachment=True,
+        filename=f"attestation_{pk}.pdf",
+    )
+def _send_attestation_email(application):
+    from django.core.mail import EmailMessage
+    student_email = application.student.user.email
+    if not student_email:
+        return
+    try:
+        msg = EmailMessage(
+            subject=f"[Stag.io] Attestation de stage — {application.offer.title}",
+            body=(
+                f"Bonjour {application.student.user.full_name},\n\n"
+                f"Votre attestation de stage pour le poste '{application.offer.title}' "
+                f"chez {application.offer.company.company_name or application.offer.company.user.full_name} "
+                f"a été émise par l'administration universitaire.\n\n"
+                f"Vous pouvez la télécharger depuis la plateforme Stag.io.\n\n"
+                f"Félicitations !\n"
+                f"L'équipe Stag.io"
+            ),
+            to=[student_email],
+        )
+        if application.attestation_file:
+            abs_path = application.attestation_file.path
+            if os.path.exists(abs_path):
+                with open(abs_path, "rb") as f:
+                    msg.attach(
+                        f"attestation_{application.pk}.pdf",
+                        f.read(),
+                        "application/pdf",
+                    )
+        msg.send()
+    except Exception:
+        pass  # never break the flow

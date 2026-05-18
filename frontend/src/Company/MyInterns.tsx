@@ -83,7 +83,7 @@ function ReportPopup({
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
 
-  const reportUrl = `http://127.0.0.1:8000/media/${intern.report_file}`;
+  const reportUrl = `${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/media/${intern.report_file}`;
 
   const handleValidate = async () => {
     setValidating(true);

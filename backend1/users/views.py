@@ -6,6 +6,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.conf import settings
+from django.utils import timezone
 from .serializers import RegisterSerializer, UserSerializer
 from .models import SignupOTP, Company
 from notifications.models import Notification
@@ -15,6 +16,10 @@ User = get_user_model()
 
 
 def _send_otp_email(user, otp):
+    """
+    Send OTP email in a background thread so it never blocks
+    or crashes the main request — even if the network dies.
+    """
     subject = "[Stag.io] Confirmation code"
     message = (
         f"Hello {user.full_name or user.username},\n\n"
@@ -22,10 +27,23 @@ def _send_otp_email(user, otp):
         f"It expires at: {otp.expires_at.isoformat()}\n\n"
         "If you did not request this account, ignore this message."
     )
-    try:
-        send_mail(subject, message, getattr(settings, "DEFAULT_FROM_EMAIL", None), [user.email], fail_silently=True)
-    except Exception:
-        pass
+
+    import threading
+
+    def _send():
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            print(f"[EMAIL ERROR] {e}")
+
+    threading.Thread(target=_send, daemon=True).start()
+
 
 
 @api_view(['POST'])
@@ -60,9 +78,13 @@ def register(request):
 @permission_classes([AllowAny])
 def login(request):
     username = request.data.get('username')
+    email = request.data.get('email')
     password = request.data.get('password')
 
-    user = authenticate(username=username, password=password)
+    # Use email if provided, otherwise use username
+    login_credential = email or username
+
+    user = authenticate(username=login_credential, password=password)
 
     if user:
         if not user.is_active:
@@ -148,7 +170,9 @@ def verify_signup_otp(request):
         return Response({'error': 'email and code are required.'}, status=400)
 
     try:
-        user = User.objects.get(email__iexact=email)
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({'error': 'User not found.'}, status=404)
     except User.DoesNotExist:
         return Response({'error': 'User not found.'}, status=404)
 
@@ -311,19 +335,20 @@ def google_login(request):
                 student_number=f"STU{user.id:04d}"
             )
         elif role == 'company':
-            from .models import Company
-            Company.objects.create(
-                user=user,
-                is_approved=False,
-                is_rejected=False,
-            )
-            # Notify admins about new company
-            admin_users = User.objects.filter(role='admin', is_active=True)
-            for admin in admin_users:
-                Notification.objects.create(
-                    recipient=admin,
-                    message=f"New company registration via Google: {email}",
-                )
+           from .models import Company
+           Company.objects.create(
+            user=user,
+            is_approved=False,
+            is_rejected=False,
+            submitted_at=timezone.now(),   # ← ADD: marks it as submitted
+ )
+    # Notify admins about new company
+    admin_users = User.objects.filter(role='admin', is_active=True)
+    for admin in admin_users:
+        Notification.objects.create(
+            recipient=admin,
+            message=f"New company registration via Google: {email}",
+        )
 
     # ── Step 4: Generate JWT tokens and return them ───────────────────────────
     refresh = RefreshToken.for_user(user)

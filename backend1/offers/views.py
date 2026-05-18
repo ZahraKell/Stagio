@@ -14,11 +14,54 @@ def get_company_profile(user):
         return None
 
 
+def _is_platform_admin(user):
+    return user.is_authenticated and getattr(user, "role", None) == "admin"
+
+
+# GET /api/admin/offers/  (via users.admin_urls)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_list_offers(request):
+    if not _is_platform_admin(request.user):
+        return Response({"error": "Admins only"}, status=403)
+    offers = InternshipOffer.objects.all().select_related(
+        "company", "company__user"
+    ).order_by("-date_posted")
+    return Response(OfferSerializer(offers, many=True).data)
+
+
+# PATCH /api/admin/offers/<id>/status/  body: {"status": "open"|"closed"|"filled"}
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def admin_patch_offer_status(request, id):
+    if not _is_platform_admin(request.user):
+        return Response({"error": "Admins only"}, status=403)
+    new_status = request.data.get("status")
+    if new_status not in ("open", "closed", "filled"):
+        return Response({"error": "Invalid status"}, status=400)
+    try:
+        offer = InternshipOffer.objects.select_related(
+            "company", "company__user"
+        ).get(pk=id)
+    except InternshipOffer.DoesNotExist:
+        return Response({"error": "Offer not found"}, status=404)
+    offer.status = new_status
+    offer.save(update_fields=["status"])
+    return Response(OfferSerializer(offer).data)
+
+
 # GET /api/offers/
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_offers(request):
-    offers     = InternshipOffer.objects.filter(status='open').select_related('company', 'company__user')
+    from django.utils import timezone
+    # Auto-close expired offers
+    InternshipOffer.objects.filter(
+        status='open',
+        deadline__lt=timezone.now().date()
+    ).update(status='closed')
+    
+    offers = InternshipOffer.objects.filter(status='open').select_related('company', 'company__user').order_by('-date_posted')
     serializer = OfferSerializer(offers, many=True)
     return Response(serializer.data)
 

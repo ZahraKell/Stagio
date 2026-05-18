@@ -469,24 +469,94 @@ def cv_score(request):
         'completed': complete,
         'tips':      tips,
     })
+def _compute_cv_score(cv):
+    """Same logic as applications._compute_cv_score but takes cv directly."""
+    score = 0
+    s = cv.student
+    if s.user.full_name: score += 10
+    if s.user.pnum:      score += 5
+    if s.institution:    score += 10
+    if s.grade:          score += 5
+    if cv.github or cv.linkedin or cv.portfolio: score += 10
+    if cv.description:   score += 5
+    if cv.educations.count() > 0:  score += 15
+    if cv.experiences.count() > 0: score += 15
+    skill_count = cv.skills.count()
+    if skill_count >= 3:   score += 20
+    elif skill_count > 0:  score += 10
+    if cv.languages.count() > 0: score += 5
+    return min(score, 100)
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_student_cvs(request):
     query = (request.query_params.get('q') or '').strip()
-    cvs = DigitalCV.objects.select_related('student__user').all().order_by('?')[:30]
     if query:
         cvs = DigitalCV.objects.select_related('student__user').filter(
             student__user__full_name__icontains=query
         )[:30]
+    else:
+        cvs = DigitalCV.objects.select_related(
+             'student__user'
+        ).prefetch_related(
+              'skills', 'languages', 'educations', 'experiences'
+        ).order_by('?')[:30]
+
+    def compute_score(cv):
+        score = 0
+        s = cv.student
+        if s.user.full_name: score += 10
+        if s.user.pnum:      score += 5
+        if s.institution:    score += 10
+        if s.grade:          score += 5
+        if cv.github or cv.linkedin or cv.portfolio: score += 10
+        if cv.description:   score += 5
+        if cv.educations.count() > 0:  score += 15
+        if cv.experiences.count() > 0: score += 15
+        skill_count = cv.skills.count()
+        if skill_count >= 3:   score += 20
+        elif skill_count > 0:  score += 10
+        if cv.languages.count() > 0: score += 5
+        return min(score, 100)
+
     data = [{
-        'student_id': cv.student.pk,
-        'full_name': cv.student.user.full_name,
-        'email': cv.student.user.email,
-        'speciality': cv.student.speciality,
-        'town': cv.student.user.town,
-        'skills': list(cv.skills.values_list('name', flat=True)[:8]),
+        'student_id':  cv.student.pk,
+        'full_name':   cv.student.user.full_name,
+        'email':       cv.student.user.email,
+        'speciality':  cv.student.speciality,
+        'institution': cv.student.institution,
+        'grade':       cv.student.grade,
+        'town':        cv.student.user.town,
+        'cv_score':    _compute_cv_score(cv),
+        'github':      cv.github,
+        'linkedin':    cv.linkedin,
+        'description': cv.description,
+        'skills':    list(cv.skills.values('name', 'level')[:8]),
+        'languages': list(cv.languages.values('name', 'level')[:8]),
+            'educations': [
+        {
+            'degree': e.degree,
+            'institution': e.institution,
+            'field': e.field,
+            'start_year': e.start_year,
+            'end_year': e.end_year,
+            'is_current': e.is_current,
+        }
+        for e in cv.educations.all()
+    ],
+    'experiences': [
+        {
+            'job_title': x.job_title,
+            'company': x.company,
+            'location': x.location,
+            'start_date': x.start_date.isoformat(),
+            'end_date': x.end_date.isoformat() if x.end_date else None,
+            'is_current': x.is_current,
+            'description': x.description,
+        }
+        for x in cv.experiences.all()
+    ],
         'cv_updated_at': cv.update_date.isoformat(),
     } for cv in cvs]
     return ok(data=data)
@@ -502,5 +572,8 @@ def get_student_cv(request, id):
     try:
         cv = student.digital_cv
     except DigitalCV.DoesNotExist:
-        return fail("CV not found for this student.", status.HTTP_404_NOT_FOUND)
-    return ok(data=_build_cv_data(cv))
+        return ok(data=None, message="No CV created yet.")
+    
+    data = _build_cv_data(cv)
+    data['cv_score'] = _compute_cv_score(cv)  # ← add this line
+    return ok(data=data)

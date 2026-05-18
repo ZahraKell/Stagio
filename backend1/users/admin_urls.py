@@ -1,5 +1,6 @@
 from django.urls import path
 from . import admin_views
+from offers.views import admin_list_offers, admin_patch_offer_status
 
 urlpatterns = [
     # ── User management ───────────────────────────────────────────────────────
@@ -25,4 +26,7 @@ urlpatterns = [
     path('companies/<int:pk>/', admin_views.get_company),
     path('companies/<int:pk>/approve/', admin_views.approve_company),
     path('companies/<int:pk>/reject/', admin_views.reject_company),
+
+    path('offers/', admin_list_offers),
+    path('offers/<int:id>/status/', admin_patch_offer_status),
 ]
