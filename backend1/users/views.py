@@ -16,6 +16,10 @@ User = get_user_model()
 
 
 def _send_otp_email(user, otp):
+    """
+    Send OTP email in a background thread so it never blocks
+    or crashes the main request — even if the network dies.
+    """
     subject = "[Stag.io] Confirmation code"
     message = (
         f"Hello {user.full_name or user.username},\n\n"
@@ -23,10 +27,25 @@ def _send_otp_email(user, otp):
         f"It expires at: {otp.expires_at.isoformat()}\n\n"
         "If you did not request this account, ignore this message."
     )
-    try:
-        send_mail(subject, message, getattr(settings, "DEFAULT_FROM_EMAIL", None), [user.email], fail_silently=True)
-    except Exception:
-        pass
+
+    import threading
+
+    def _send():
+        try:
+            send_mail(
+                subject,
+                message,
+                getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                [user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass  # never crash — email is optional
+
+    # Run in background thread — request returns immediately
+    # even if email takes 30 seconds or fails completely
+    t = threading.Thread(target=_send, daemon=True)
+    t.start()
 
 
 @api_view(['POST'])
