@@ -22,12 +22,6 @@ class Application(models.Model):
     report_validated_at = models.DateTimeField(null=True, blank=True)
     attestation_file = models.FileField(upload_to='attestations/', blank=True, null=True)
     attestation_issued_at = models.DateTimeField(null=True, blank=True)
-    uploaded_convention_file = models.FileField(
-        upload_to='conventions/student_uploads/', blank=True, null=True
-    )
-    student_attestation_upload = models.FileField(
-        upload_to='attestations/student_uploads/', blank=True, null=True
-    )
 
     class Meta:
         unique_together = ('student', 'offer')
