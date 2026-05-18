@@ -35,17 +35,15 @@ def _send_otp_email(user, otp):
             send_mail(
                 subject,
                 message,
-                getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                settings.DEFAULT_FROM_EMAIL,
                 [user.email],
                 fail_silently=True,
             )
-        except Exception:
-            pass  # never crash — email is optional
+        except Exception as e:
+            print(f"[EMAIL ERROR] {e}")
 
-    # Run in background thread — request returns immediately
-    # even if email takes 30 seconds or fails completely
-    t = threading.Thread(target=_send, daemon=True)
-    t.start()
+    threading.Thread(target=_send, daemon=True).start()
+
 
 
 @api_view(['POST'])
