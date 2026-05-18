@@ -4,7 +4,7 @@ from rest_framework.response   import Response
 from rest_framework            import status
 from django.contrib.auth       import get_user_model
 from django.utils import timezone
-from django.core.mail import send_mail
+from .email_utils import send_transactional_email
 from django.conf import settings
 from .models import AllowedInstitutionDomain
 from .models import Company
@@ -297,13 +297,14 @@ def approve_company(request, pk):
     company.rejection_reason = None
     company.approved_at = timezone.now()
     company.save(update_fields=['is_approved', 'is_rejected', 'rejection_reason', 'approved_at'])
-    send_mail(
-        "[Stag.io] Company account approved",
-        "Your company profile has been approved. You can now publish internship offers.",
-        getattr(settings, "DEFAULT_FROM_EMAIL", None),
-        [company.user.email],
-        fail_silently=True,
-    )
+    try:
+        send_transactional_email(
+            "[Stag.io] Company account approved",
+            "Your company profile has been approved. You can now publish internship offers.",
+            [company.user.email],
+        )
+    except Exception:
+        pass
     return ok(message="Company approved.")
 
 
@@ -325,11 +326,12 @@ def reject_company(request, pk):
     company.rejection_reason = reason
     company.approved_at = None
     company.save(update_fields=['is_approved', 'is_rejected', 'rejection_reason', 'approved_at'])
-    send_mail(
-        "[Stag.io] Company account rejected",
-        f"Your company profile was rejected.\nReason: {reason}",
-        getattr(settings, "DEFAULT_FROM_EMAIL", None),
-        [company.user.email],
-        fail_silently=True,
-    )
+    try:
+        send_transactional_email(
+            "[Stag.io] Company account rejected",
+            f"Your company profile was rejected.\nReason: {reason}",
+            [company.user.email],
+        )
+    except Exception:
+        pass
     return ok(message="Company rejected.")

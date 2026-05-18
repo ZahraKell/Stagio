@@ -193,6 +193,9 @@ EMAIL_HOST_PASSWORD = _raw_email_password.replace(' ', '')
 # Gmail SMTP only reliably sends when From matches the authenticated mailbox
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'webmaster@localhost')
 
+# Resend (HTTPS) — required on Railway because outbound SMTP is blocked
+RESEND_API_KEY = config('RESEND_API_KEY', default='')
+
 # ── External APIs ──────────────────────────────────────────
 GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 YOUTUBE_API_KEY  = config('YOUTUBE_API_KEY',  default='')

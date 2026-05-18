@@ -6,10 +6,10 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
-from django.core.mail import get_connection, send_mail
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from .email_utils import email_configured, send_transactional_email
 from .serializers import RegisterSerializer, UserSerializer
 from .models import SignupOTP, Company
 from notifications.models import Notification
@@ -20,19 +20,12 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-def _otp_from_email():
-    """Gmail requires From to match the authenticated account."""
-    return settings.EMAIL_HOST_USER or settings.DEFAULT_FROM_EMAIL
-
-
 def _send_otp_email(user, otp):
-    """
-    Send signup OTP synchronously so Gunicorn does not drop a daemon thread
-    before SMTP finishes. Errors are logged to Railway/Vercel backend logs.
-    """
-    if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+    """Send signup OTP (Resend on Railway, SMTP locally)."""
+    if not email_configured():
         logger.error(
-            'Signup OTP not sent: EMAIL_HOST_USER or EMAIL_HOST_PASSWORD is missing.'
+            'Signup OTP not sent: configure RESEND_API_KEY + DEFAULT_FROM_EMAIL '
+            '(Railway) or EMAIL_HOST_USER + EMAIL_HOST_PASSWORD (local).'
         )
         return False
 
@@ -45,18 +38,7 @@ def _send_otp_email(user, otp):
     )
 
     try:
-        connection = get_connection(
-            fail_silently=False,
-            timeout=getattr(settings, 'EMAIL_TIMEOUT', 15),
-        )
-        send_mail(
-            subject,
-            message,
-            _otp_from_email(),
-            [user.email],
-            fail_silently=False,
-            connection=connection,
-        )
+        send_transactional_email(subject, message, [user.email])
         logger.info('Signup OTP email sent to %s', user.email)
         return True
     except Exception:
@@ -93,8 +75,8 @@ def register(request):
             {
                 'error': (
                     'Account could not be created because the confirmation email '
-                    'could not be sent. Check server email settings (Gmail app password) '
-                    'or try again later.'
+                    'could not be sent. On Railway, use Resend (RESEND_API_KEY); '
+                    'locally, use Gmail SMTP.'
                 ),
             },
             status=503,
@@ -451,12 +433,8 @@ def forgot_password(request):
             f"L'équipe Stag.io"
         )
         try:
-            send_mail(
-                subject, message,
-                _otp_from_email(),
-                [user.email],
-                fail_silently=False,
-            )
+            if email_configured():
+                send_transactional_email(subject, message, [user.email])
         except Exception:
             logger.exception('Password reset email failed for %s', user.email)
     except User.DoesNotExist:
