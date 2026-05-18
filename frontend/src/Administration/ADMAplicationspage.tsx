@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import DashboardLayout from "../components/DashboardLayout";
 import {
   CheckCircle, XCircle, RefreshCw, X, AlertTriangle,
-  ArrowRight, FileText, Clock, CheckSquare, XSquare, Eye,
+  ArrowRight, FileText, Clock, CheckSquare, XSquare,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../api";
@@ -18,123 +18,13 @@ interface AppRow {
   offer_company_name?: string;
   student_name: string;
   student_email: string;
-  student_id: number;
-  cv_score?: number;
   status: string;
   application_date: string;
 }
 
 function unwrapApps(res: { data: unknown }): AppRow[] {
   const body = res.data as { data?: AppRow[] };
-  return (body?.data ?? []).map((row) => ({
-    ...row,
-    student_id: row.student_id ?? 0,
-    cv_score: row.cv_score ?? 0,
-  }));
-}
-
-/* ══════════════════════════════════════════════════════════
-   CV MODAL
-   ══════════════════════════════════════════════════════════ */
-interface CvSkill { id: number; name: string; level: string }
-interface CvData {
-  cv_score?: number;
-  description?: string;
-  skills?: CvSkill[];
-  educations?: { id: number; degree: string; institution: string; start_year: number; end_year: number | null; is_current: boolean }[];
-  experiences?: { id: number; job_title: string; company: string; description: string }[];
-}
-
-function CVModal({ app, onClose }: { app: AppRow; onClose: () => void }) {
-  const [cvData, setCvData] = useState<CvData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!app.student_id) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    api
-      .get(`users/students/${app.student_id}/cv/`)
-      .then((res) => {
-        const body = res.data as { error?: boolean; data?: CvData };
-        setCvData(!body.error && body.data ? body.data : null);
-      })
-      .catch(() => setCvData(null))
-      .finally(() => setLoading(false));
-  }, [app.student_id]);
-
-  return (
-    <div
-      className="conv-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="conv-popup" style={{ maxWidth: 560 }}>
-        <div className="conv-head">
-          <div className="conv-head-icon" style={{ background: "#eff6ff", color: "#2563eb" }}>
-            <Eye size={22} />
-          </div>
-          <div>
-            <h3>CV — {app.student_name}</h3>
-            <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>{app.student_email}</p>
-          </div>
-          <button type="button" className="conv-close" onClick={onClose}>
-            <X size={16} />
-          </button>
-        </div>
-        <div className="conv-body">
-          {loading ? (
-            <p style={{ fontSize: 13, color: "#6b7280" }}>Chargement du CV…</p>
-          ) : !cvData ? (
-            <p style={{ fontSize: 13, color: "#6b7280" }}>
-              Cet étudiant n&apos;a pas encore de CV numérique.
-            </p>
-          ) : (
-            <>
-              <div className="conv-summary">
-                <div className="conv-summary-item">
-                  <span>Score CV</span>
-                  <strong>{cvData.cv_score ?? app.cv_score ?? 0}%</strong>
-                </div>
-                <div className="conv-summary-item">
-                  <span>Offre</span>
-                  <strong>{app.offer_title}</strong>
-                </div>
-              </div>
-              {cvData.description && (
-                <p style={{ fontSize: 13, lineHeight: 1.6, marginTop: 12 }}>{cvData.description}</p>
-              )}
-              {cvData.skills && cvData.skills.length > 0 && (
-                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {cvData.skills.map((sk) => (
-                    <span
-                      key={sk.id}
-                      style={{
-                        fontSize: 12,
-                        padding: "3px 10px",
-                        borderRadius: 99,
-                        background: "#f1f5f9",
-                      }}
-                    >
-                      {sk.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-        <div className="conv-footer">
-          <button type="button" className="conv-btn-cancel" onClick={onClose}>
-            Fermer
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return body?.data ?? [];
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -160,14 +50,7 @@ function RejectModal({
     }
     setSubmitting(true);
     try {
-      if (app.status === "accepted") {
-        await api.put(`applications/${app.id}/reject/`, { reason });
-      } else {
-        await api.put(`applications/${app.id}/administration-review/`, {
-          action: "refuse",
-          reason,
-        });
-      }
+      await api.put(`applications/${app.id}/reject/`, { reason });
       setDone(true);
       setTimeout(() => { onRejected(); }, 1600);
     } catch {
@@ -187,7 +70,7 @@ function RejectModal({
             <XCircle size={22} />
           </div>
           <div>
-            <h3>Refuser la candidature</h3>
+            <h3>Reject Internship Convention</h3>
             <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>Application #{app.id}</p>
           </div>
           {!done && (
@@ -198,8 +81,8 @@ function RejectModal({
         {done ? (
           <div className="conv-success">
             <div className="conv-success-icon" style={{ fontSize: 36 }}>❌</div>
-            <h3>Candidature refusée</h3>
-            <p>L'étudiant a été notifié avec le motif indiqué.</p>
+            <h3>Convention Rejected</h3>
+            <p>The student and company have been notified with the reason provided.</p>
           </div>
         ) : (
           <>
@@ -237,7 +120,7 @@ function RejectModal({
                   display: "block", fontSize: 13, fontWeight: 600,
                   color: "#374151", marginBottom: 6,
                 }}>
-                  Motif du refus <span style={{ color: "#ef4444" }}>*</span>
+                  Reason for rejection <span style={{ color: "#ef4444" }}>*</span>
                 </label>
                 <textarea
                   value={reason}
@@ -428,8 +311,6 @@ const ADMApplicationsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [rejectTarget, setRejectTarget] = useState<AppRow | null>(null);
   const [validateTarget, setValidateTarget] = useState<AppRow | null>(null);
-  const [cvTarget, setCvTarget] = useState<AppRow | null>(null);
-  const [approvingId, setApprovingId] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -565,69 +446,24 @@ const ADMApplicationsPage: React.FC = () => {
                         {a.application_date ? String(a.application_date).slice(0, 10) : "—"}
                       </td>
                       <td>
-                        <div className="adm-actions">
-                          <button
-                            type="button"
-                            className="adm-action-btn sm"
-                            onClick={() => setCvTarget(a)}
-                          >
-                            <Eye size={13} /> Voir CV
-                          </button>
-                          {(a.status === "pending" || a.status === "reviewed") && (
-                            <>
-                              <button
-                                type="button"
-                                className="adm-action-btn approve sm"
-                                disabled={approvingId === a.id}
-                                onClick={() => {
-                                  void (async () => {
-                                    setApprovingId(a.id);
-                                    try {
-                                      await api.put(
-                                        `applications/${a.id}/administration-review/`,
-                                        { action: "approve" },
-                                      );
-                                      toast.success("Candidature approuvée.");
-                                      await load();
-                                    } catch {
-                                      toast.error("Échec de l'approbation.");
-                                    } finally {
-                                      setApprovingId(null);
-                                    }
-                                  })();
-                                }}
-                              >
-                                <CheckCircle size={13} />{" "}
-                                {approvingId === a.id ? "…" : "Approuver"}
-                              </button>
-                              <button
-                                type="button"
-                                className="adm-action-btn reject sm"
-                                onClick={() => setRejectTarget(a)}
-                              >
-                                <XCircle size={13} /> Refuser
-                              </button>
-                            </>
-                          )}
-                          {a.status === "accepted" && (
-                            <>
-                              <button
-                                type="button"
-                                className="adm-action-btn approve sm"
-                                onClick={() => setValidateTarget(a)}
-                              >
-                                <CheckCircle size={13} /> Valider
-                              </button>
-                              <button
-                                type="button"
-                                className="adm-action-btn reject sm"
-                                onClick={() => setRejectTarget(a)}
-                              >
-                                <XCircle size={13} /> Refuser
-                              </button>
-                            </>
-                          )}
-                        </div>
+                        {a.status === "accepted" && (
+                          <div className="adm-actions">
+                            <button
+                              type="button"
+                              className="adm-action-btn approve sm"
+                              onClick={() => setValidateTarget(a)}
+                            >
+                              <CheckCircle size={13} /> Validate
+                            </button>
+                            <button
+                              type="button"
+                              className="adm-action-btn reject sm"
+                              onClick={() => setRejectTarget(a)}
+                            >
+                              <XCircle size={13} /> Reject
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -654,10 +490,6 @@ const ADMApplicationsPage: React.FC = () => {
               void load();
             }}
           />
-        )}
-
-        {cvTarget && (
-          <CVModal app={cvTarget} onClose={() => setCvTarget(null)} />
         )}
 
         {rejectTarget && (

@@ -26,7 +26,6 @@ type AppStatus = "pending" | "review" | "accepted" | "rejected" | "validated";
 
 interface Application {
   id: number;
-  offerId: number;
   title: string;
   company: string;
   logo: string;
@@ -35,9 +34,6 @@ interface Application {
   status: AppStatus;
   stage_state: string;
   attestation_issued: boolean;
-  has_report: boolean;
-  has_uploaded_convention: boolean;
-  report_validated: boolean;
 }
 
 interface ConventionRow {
@@ -64,37 +60,6 @@ type ApiMyApplicationRow = {
   application_date?: string | null;
   stage_state?: string | null;
   attestation_issued_at?: string | null;
-  report_submitted_at?: string | null;
-  report_validated_at?: string | null;
-  has_report?: boolean;
-  has_uploaded_convention?: boolean;
-};
-
-interface OfferDetail {
-  id: number;
-  title: string;
-  company_name?: string;
-  town?: string;
-  duration?: string;
-  internship_type?: string;
-  description?: string;
-  is_paid?: boolean;
-  salary?: string | null;
-  tech_stack?: string | null;
-  skills?: string | null;
-  deadline?: string | null;
-  field?: string | null;
-}
-
-type RowActions = {
-  enAttente?: boolean;
-  signConvention?: boolean;
-  uploadConvention?: boolean;
-  uploadReport?: boolean;
-  uploadAttestation?: boolean;
-  downloadAttestation?: boolean;
-  viewOffer?: boolean;
-  viewConvention?: boolean;
 };
 
 /* ══════════════════════════════════════════════════════════
@@ -131,7 +96,6 @@ function mapRow(row: ApiMyApplicationRow): Application {
   const status = mapBackendStatus(row.status ?? "pending");
   return {
     id: row.id,
-    offerId: row.offer,
     title: row.offer_title || `Offer #${row.offer}`,
     company,
     logo: initials(company),
@@ -140,88 +104,7 @@ function mapRow(row: ApiMyApplicationRow): Application {
     status,
     stage_state: row.stage_state ?? "",
     attestation_issued: !!row.attestation_issued_at,
-    has_report: !!row.has_report || !!row.report_submitted_at,
-    has_uploaded_convention: !!row.has_uploaded_convention,
-    report_validated: !!row.report_validated_at,
   };
-}
-
-function conventionReady(conv: ConventionRow | undefined): boolean {
-  return !!(
-    conv &&
-    conv.student_signed &&
-    conv.company_signed &&
-    conv.admin_validated
-  );
-}
-
-function resolveRowActions(
-  app: Application,
-  conv: ConventionRow | undefined,
-): RowActions {
-  if (app.status === "rejected") {
-    return { viewOffer: true };
-  }
-
-  if (app.status === "pending" || app.status === "review") {
-    return { enAttente: true, viewOffer: true };
-  }
-
-  if (app.status === "accepted" && conv && !conv.student_signed) {
-    return { signConvention: true, viewOffer: true };
-  }
-
-  if (
-    app.status === "accepted" &&
-    conv &&
-    conv.student_signed &&
-    !conv.admin_validated
-  ) {
-    return { enAttente: true, viewOffer: true };
-  }
-
-  if (app.stage_state === "report_to_validate") {
-    return { enAttente: true, viewConvention: true };
-  }
-
-  if (app.stage_state === "report_validated" && !app.attestation_issued) {
-    return {
-      uploadAttestation: true,
-      uploadConvention: true,
-      viewConvention: true,
-    };
-  }
-
-  if (app.attestation_issued) {
-    return {
-      downloadAttestation: true,
-      viewConvention: true,
-    };
-  }
-
-  const postSign =
-    conventionReady(conv) ||
-    app.status === "validated" ||
-    app.stage_state === "internship_in_progress" ||
-    app.stage_state === "validated";
-
-  if (postSign && !app.has_report) {
-    return {
-      uploadConvention: true,
-      uploadReport: true,
-      viewConvention: true,
-    };
-  }
-
-  if (postSign && app.has_report) {
-    return { enAttente: true, viewConvention: true };
-  }
-
-  if (app.status === "accepted") {
-    return { enAttente: true, viewOffer: true };
-  }
-
-  return { viewOffer: true };
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -275,279 +158,55 @@ function buildTimeline(app: Application, conv: ConventionRow | undefined) {
 }
 
 /* ══════════════════════════════════════════════════════════
-   CENTERED MODAL SHELL
+   REPORT SECTION
    ══════════════════════════════════════════════════════════ */
-function CenteredModal({
-  onClose,
-  children,
-  wide,
+function ReportSection({
+  appId,
+  onRefresh,
 }: {
-  onClose: () => void;
-  children: React.ReactNode;
-  wide?: boolean;
+  appId: number;
+  onRefresh: () => void;
 }) {
-  return (
-    <motion.div
-      className="app-modal-backdrop"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.div
-        className={`app-modal${wide ? " app-modal-wide" : ""}`}
-        initial={{ opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.94 }}
-        transition={{ duration: 0.22 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {children}
-      </motion.div>
-    </motion.div>
-  );
-}
+  const [uploading, setUploading] = useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
 
-/* ══════════════════════════════════════════════════════════
-   OFFER DETAIL MODAL
-   ══════════════════════════════════════════════════════════ */
-function OfferDetailModal({
-  offerId,
-  fallback,
-  onClose,
-}: {
-  offerId: number;
-  fallback: Application;
-  onClose: () => void;
-}) {
-  const [offer, setOffer] = useState<OfferDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("report_file", file);
+      await api.post(`applications/${appId}/submit-report/`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast.success("Rapport soumis !");
+      onRefresh();
+    } catch {
+      toast.error("Échec de l'envoi du rapport.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
-  useEffect(() => {
-    setLoading(true);
-    api
-      .get<OfferDetail>(`offers/${offerId}/`)
-      .then((res) => setOffer(res.data))
-      .catch(() => setOffer(null))
-      .finally(() => setLoading(false));
-  }, [offerId]);
-
-  const title = offer?.title ?? fallback.title;
-  const company = offer?.company_name ?? fallback.company;
-  const town = offer?.town ?? fallback.wilaya;
-
-  return (
-    <CenteredModal onClose={onClose}>
-      <motion.div
-        className="off-modal-header"
-        style={{ margin: 0, padding: 0, border: "none" }}
-      >
-        <motion.div className="sc-offer-logo off-modal-logo">
-          {initials(company)}
-        </motion.div>
-        <motion.div className="off-modal-title">
-          <h2>{title}</h2>
-          <span>
-            {company} · {town}
-          </span>
-        </motion.div>
-        <button type="button" className="off-modal-close" onClick={onClose}>
-          <X size={20} />
-        </button>
-      </motion.div>
-
-      {loading ? (
-        <p style={{ color: "var(--sc-muted)", fontSize: 13 }}>Chargement…</p>
-      ) : (
-        <>
-          <motion.div className="off-modal-badges">
-            <span className={`sc-badge ${statusConfig[fallback.status].badgeClass}`}>
-              {statusConfig[fallback.status].icon}{" "}
-              {statusConfig[fallback.status].label}
-            </span>
-            {offer?.duration && (
-              <span className="off-mpill">
-                <Clock size={12} /> {offer.duration}
-              </span>
-            )}
-            {offer?.deadline && (
-              <span className="off-mpill">
-                <Calendar size={12} /> Clôture {formatDate(offer.deadline)}
-              </span>
-            )}
-          </motion.div>
-
-          <motion.div className="off-modal-section">
-            <h3>Description</h3>
-            <p>{offer?.description || "Aucune description disponible."}</p>
-          </motion.div>
-
-          <motion.div className="off-modal-details">
-            <motion.div className="off-mdetail">
-              <span>Type</span>
-              <strong>{offer?.internship_type || "—"}</strong>
-            </motion.div>
-            <motion.div className="off-mdetail">
-              <span>Rémunération</span>
-              <strong>
-                {offer?.is_paid
-                  ? offer.salary || "Rémunéré"
-                  : "Non rémunéré"}
-              </strong>
-            </motion.div>
-            <motion.div className="off-mdetail">
-              <span>Domaine</span>
-              <strong>{offer?.field || "—"}</strong>
-            </motion.div>
-            <motion.div className="off-mdetail">
-              <span>Technologies</span>
-              <strong>{offer?.tech_stack || offer?.skills || "—"}</strong>
-            </motion.div>
-          </motion.div>
-        </>
-      )}
-
-      <motion.div className="off-modal-cta">
-        <button type="button" className="sc-btn-outline" onClick={onClose}>
-          Fermer
-        </button>
-      </motion.div>
-    </CenteredModal>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════
-   FILE UPLOAD BUTTON
-   ══════════════════════════════════════════════════════════ */
-function FileUploadBtn({
-  label,
-  accept,
-  uploading,
-  onPick,
-}: {
-  label: string;
-  accept: string;
-  uploading: boolean;
-  onPick: (file: File) => void;
-}) {
-  const ref = React.useRef<HTMLInputElement>(null);
   return (
     <>
       <input
         type="file"
-        accept={accept}
-        ref={ref}
+        accept=".pdf,.doc,.docx"
+        ref={fileRef}
         style={{ display: "none" }}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onPick(f);
-          e.target.value = "";
-        }}
+        onChange={handleUpload}
       />
       <button
-        type="button"
-        className="sc-btn-download"
+        className="sc-btn-primary off-apply-full"
+        style={{ background: "#8b5cf6" }}
+        onClick={() => fileRef.current?.click()}
         disabled={uploading}
-        onClick={() => ref.current?.click()}
       >
-        <FileText size={13} /> {uploading ? "Envoi…" : label}
+        <FileText size={16} /> {uploading ? "Envoi en cours…" : "Soumettre le rapport de stage"}
       </button>
     </>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════
-   ROW ACTION BUTTONS
-   ══════════════════════════════════════════════════════════ */
-function AppRowActions({
-  app,
-  conv,
-  actions,
-  uploading,
-  onSign,
-  onViewOffer,
-  onViewConvention,
-  onUploadConvention,
-  onUploadReport,
-  onUploadAttestation,
-  onDownloadAttestation,
-}: {
-  app: Application;
-  conv?: ConventionRow;
-  actions: RowActions;
-  uploading: string | null;
-  onSign: () => void;
-  onViewOffer: () => void;
-  onViewConvention: () => void;
-  onUploadConvention: (file: File) => void;
-  onUploadReport: (file: File) => void;
-  onUploadAttestation: (file: File) => void;
-  onDownloadAttestation: () => void;
-}) {
-  return (
-    <motion.div className="app-row-actions">
-      {actions.enAttente && (
-        <button type="button" className="app-btn-wait" disabled>
-          <Clock size={13} /> En attente
-        </button>
-      )}
-      {actions.signConvention && conv && (
-        <button type="button" className="sc-btn-download" onClick={onSign}>
-          ✍️ Signer convention
-        </button>
-      )}
-      {actions.uploadConvention && (
-        <FileUploadBtn
-          label={
-            app.has_uploaded_convention
-              ? "Convention envoyée"
-              : "Téléverser convention"
-          }
-          accept=".pdf"
-          uploading={uploading === `conv-${app.id}`}
-          onPick={onUploadConvention}
-        />
-      )}
-      {actions.uploadReport && (
-        <FileUploadBtn
-          label="Téléverser rapport"
-          accept=".pdf,.doc,.docx"
-          uploading={uploading === `report-${app.id}`}
-          onPick={onUploadReport}
-        />
-      )}
-      {actions.uploadAttestation && (
-        <FileUploadBtn
-          label="Téléverser attestation"
-          accept=".pdf"
-          uploading={uploading === `att-${app.id}`}
-          onPick={onUploadAttestation}
-        />
-      )}
-      {actions.downloadAttestation && (
-        <button
-          type="button"
-          className="sc-btn-download"
-          onClick={onDownloadAttestation}
-        >
-          <Download size={13} /> Attestation
-        </button>
-      )}
-      {actions.viewConvention && conv && (
-        <button
-          type="button"
-          className="app-view-btn"
-          onClick={onViewConvention}
-        >
-          <Eye size={14} /> Voir
-        </button>
-      )}
-      {actions.viewOffer && (
-        <button type="button" className="app-view-btn" onClick={onViewOffer}>
-          <Eye size={14} /> Voir <ChevronRight size={13} />
-        </button>
-      )}
-    </motion.div>
   );
 }
 
@@ -713,8 +372,7 @@ const ApplicationsPage: React.FC = () => {
   const [conventions, setConventions] = useState<ConventionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<AppStatus | "all">("all");
-  const [offerModal, setOfferModal] = useState<Application | null>(null);
-  const [uploading, setUploading] = useState<string | null>(null);
+  const [modal, setModal] = useState<Application | null>(null);
   const [signTarget, setSignTarget] = useState<{
     app: Application;
     conv: ConventionRow;
@@ -826,56 +484,10 @@ const ApplicationsPage: React.FC = () => {
     }
   };
 
-  const handleUploadConvention = async (appId: number, file: File) => {
-    setUploading(`conv-${appId}`);
-    try {
-      const form = new FormData();
-      form.append("convention_file", file);
-      await api.post(`applications/${appId}/upload-convention/`, form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      toast.success("Convention téléversée.");
-      await loadAll();
-    } catch {
-      toast.error("Échec du téléversement de la convention.");
-    } finally {
-      setUploading(null);
-    }
-  };
-
-  const handleUploadReport = async (appId: number, file: File) => {
-    setUploading(`report-${appId}`);
-    try {
-      const form = new FormData();
-      form.append("report_file", file);
-      await api.post(`applications/${appId}/submit-report/`, form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      toast.success("Rapport soumis à l'entreprise.");
-      await loadAll();
-    } catch {
-      toast.error("Échec de l'envoi du rapport.");
-    } finally {
-      setUploading(null);
-    }
-  };
-
-  const handleUploadAttestation = async (appId: number, file: File) => {
-    setUploading(`att-${appId}`);
-    try {
-      const form = new FormData();
-      form.append("attestation_file", file);
-      await api.post(`applications/${appId}/upload-attestation/`, form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      toast.success("Attestation téléversée.");
-      await loadAll();
-    } catch {
-      toast.error("Échec du téléversement de l'attestation.");
-    } finally {
-      setUploading(null);
-    }
-  };
+  /* convention for the application currently in the modal */
+  const modalConv = modal
+    ? conventions.find((c) => c.application_id === modal.id)
+    : undefined;
 
   return (
     <DashboardLayout pageTitle="My Applications">
@@ -953,7 +565,8 @@ const ApplicationsPage: React.FC = () => {
               {filtered.map((app, i) => {
                 const cfg = statusConfig[app.status];
                 const conv = conventions.find((c) => c.application_id === app.id);
-                const actions = resolveRowActions(app, conv);
+                const canDownload =
+                  app.status === "validated" && conv?.admin_validated;
 
                 return (
                   <motion.div
@@ -985,29 +598,33 @@ const ApplicationsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <AppRowActions
-                      app={app}
-                      conv={conv}
-                      actions={actions}
-                      uploading={uploading}
-                      onSign={() => conv && setSignTarget({ app, conv })}
-                      onViewOffer={() => setOfferModal(app)}
-                      onViewConvention={() =>
-                        conv && void handlePreviewConvention(conv.id)
-                      }
-                      onUploadConvention={(file) =>
-                        void handleUploadConvention(app.id, file)
-                      }
-                      onUploadReport={(file) =>
-                        void handleUploadReport(app.id, file)
-                      }
-                      onUploadAttestation={(file) =>
-                        void handleUploadAttestation(app.id, file)
-                      }
-                      onDownloadAttestation={() =>
-                        void handleDownloadAttestation(app.id)
-                      }
-                    />
+                    {/* Actions */}
+                    <div className="app-row-actions">
+                      {/* sign convention */}
+                      {app.status === "accepted" && conv && !conv.student_signed && (
+                        <button
+                          className="sc-btn-download"
+                          onClick={() => setSignTarget({ app, conv })}
+                        >
+                          ✍️ Signer
+                        </button>
+                      )}
+                      {/* download convention */}
+                      {canDownload && (
+                        <button
+                          className="sc-btn-download"
+                          onClick={() => handleDownloadConvention(conv!.id)}
+                        >
+                          <Download size={13} /> Convention
+                        </button>
+                      )}
+                      <button
+                        className="app-view-btn"
+                        onClick={() => setModal(app)}
+                      >
+                        <Eye size={14} /> View <ChevronRight size={13} />
+                      </button>
+                    </div>
                   </motion.div>
                 );
               })}
@@ -1016,13 +633,157 @@ const ApplicationsPage: React.FC = () => {
         </AnimatePresence>
       )}
 
+      {/* ── MODAL ── */}
       <AnimatePresence>
-        {offerModal && (
-          <OfferDetailModal
-            offerId={offerModal.offerId}
-            fallback={offerModal}
-            onClose={() => setOfferModal(null)}
-          />
+        {modal && (
+          <>
+            <motion.div
+              className="off-modal-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setModal(null)}
+            />
+            <motion.div
+              className="off-modal app-modal"
+              initial={{ opacity: 0, scale: 0.93, y: 40 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.93, y: 40 }}
+              transition={{ duration: 0.26, ease: "easeOut" }}
+            >
+              {/* Header */}
+              <div className="off-modal-header">
+                <div className="sc-offer-logo off-modal-logo">{modal.logo}</div>
+                <div className="off-modal-title">
+                  <h2>{modal.title}</h2>
+                  <span>{modal.company} · {modal.wilaya}</span>
+                </div>
+                <button className="off-modal-close" onClick={() => setModal(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Badges */}
+              <div className="off-modal-badges">
+                <span className={`sc-badge ${statusConfig[modal.status].badgeClass}`}>
+                  {statusConfig[modal.status].icon} {statusConfig[modal.status].label}
+                </span>
+                <span className="off-mpill"><Calendar size={12} />Applied {modal.appliedDate}</span>
+              </div>
+
+              {/* Timeline (built from real status) */}
+              <div className="off-modal-section">
+                <h3>Application Timeline</h3>
+                <div className="app-timeline">
+                  {buildTimeline(modal, modalConv).map((ev, idx, arr) => (
+                    <div
+                      key={idx}
+                      className={`app-tl-step ${ev.done ? "done" : "todo"}`}
+                    >
+                      <div className="app-tl-dot">
+                        {ev.done
+                          ? <CheckCircle2 size={16} />
+                          : <div className="app-tl-empty-dot" />}
+                      </div>
+                      {idx < arr.length - 1 && (
+                        <div className={`app-tl-line ${ev.done ? "done" : ""}`} />
+                      )}
+                      <div className="app-tl-content">
+                        <span className="app-tl-label">{ev.label}</span>
+                        <span className="app-tl-date">{ev.date}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Details */}
+              <div className="off-modal-section">
+                <h3>Details</h3>
+                <div className="off-modal-details">
+                  <div className="off-mdetail">
+                    <span>Applied on</span>
+                    <strong>{modal.appliedDate}</strong>
+                  </div>
+                  <div className="off-mdetail">
+                    <span>Company</span>
+                    <strong>{modal.company}</strong>
+                  </div>
+                  <div className="off-mdetail">
+                    <span>Location</span>
+                    <strong>{modal.wilaya}</strong>
+                  </div>
+                  <div className="off-mdetail">
+                    <span>Status</span>
+                    <strong>{statusConfig[modal.status].label}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTA */}
+              <div className="off-modal-cta">
+                {/* sign convention */}
+                {modal.status === "accepted" && modalConv && !modalConv.student_signed && (
+                  <button
+                    className="sc-btn-primary off-apply-full"
+                    onClick={() => {
+                      setSignTarget({ app: modal, conv: modalConv });
+                      setModal(null);
+                    }}
+                  >
+                    ✍️ Signer la convention
+                  </button>
+                )}
+
+                {/* validated → preview / download / report / attestation */}
+                {modal.status === "validated" && modalConv?.admin_validated && (
+                  <>
+                    <button
+                      className="sc-btn-primary off-apply-full"
+                      style={{ background: "#3b82f6" }}
+                      onClick={() => handlePreviewConvention(modalConv.id)}
+                    >
+                      <Eye size={16} /> Voir la convention
+                    </button>
+                    <button
+                      className="sc-btn-primary off-apply-full"
+                      onClick={() => handleDownloadConvention(modalConv.id)}
+                    >
+                      <Download size={16} /> Télécharger la convention
+                    </button>
+                    {modal.attestation_issued ? (
+                      <button
+                        className="sc-btn-primary off-apply-full"
+                        style={{ background: "#22c55e" }}
+                        onClick={() => handleDownloadAttestation(modal.id)}
+                      >
+                        🏅 Télécharger l'attestation de stage
+                      </button>
+                    ) : (
+                      <ReportSection appId={modal.id} onRefresh={loadAll} />
+                    )}
+                  </>
+                )}
+
+                {/* not yet actionable */}
+                {!(modal.status === "accepted" && modalConv && !modalConv.student_signed) &&
+                  !(modal.status === "validated" && modalConv?.admin_validated) && (
+                    <div className="app-no-convention">
+                      <FileText size={16} />
+                      {modal.status === "accepted"
+                        ? "Convention is being prepared…"
+                        : modal.status === "rejected"
+                          ? "Application not selected"
+                          : "Convention available once accepted"}
+                    </div>
+                  )}
+
+                <button className="sc-btn-outline" onClick={() => setModal(null)}>
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
