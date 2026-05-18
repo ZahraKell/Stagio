@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -12,37 +14,48 @@ from .models import SignupOTP, Company
 from notifications.models import Notification
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+
 User = get_user_model()
+logger = logging.getLogger(__name__)
+
+
+def _otp_from_email():
+    """Gmail requires From to match the authenticated account."""
+    return settings.EMAIL_HOST_USER or settings.DEFAULT_FROM_EMAIL
 
 
 def _send_otp_email(user, otp):
     """
-    Send OTP email in a background thread so it never blocks
-    or crashes the main request — even if the network dies.
+    Send signup OTP synchronously so Gunicorn does not drop a daemon thread
+    before SMTP finishes. Errors are logged to Railway/Vercel backend logs.
     """
-    subject = "[Stag.io] Confirmation code"
+    if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+        logger.error(
+            'Signup OTP not sent: EMAIL_HOST_USER or EMAIL_HOST_PASSWORD is missing.'
+        )
+        return False
+
+    subject = '[Stag.io] Confirmation code'
     message = (
         f"Hello {user.full_name or user.username},\n\n"
         f"Your confirmation code is: {otp.code}\n"
         f"It expires at: {otp.expires_at.isoformat()}\n\n"
-        "If you did not request this account, ignore this message."
+        'If you did not request this account, ignore this message.'
     )
 
-    import threading
-
-    def _send():
-        try:
-            send_mail(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                fail_silently=False,
-            )
-        except Exception as e:
-            print(f"[EMAIL ERROR] {e}")
-
-    threading.Thread(target=_send, daemon=True).start()
+    try:
+        send_mail(
+            subject,
+            message,
+            _otp_from_email(),
+            [user.email],
+            fail_silently=False,
+        )
+        logger.info('Signup OTP email sent to %s', user.email)
+        return True
+    except Exception:
+        logger.exception('Signup OTP email failed for %s', user.email)
+        return False
 
 
 
@@ -406,12 +419,12 @@ def forgot_password(request):
         try:
             send_mail(
                 subject, message,
-                getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+                _otp_from_email(),
                 [user.email],
-                fail_silently=True
+                fail_silently=False,
             )
         except Exception:
-            pass
+            logger.exception('Password reset email failed for %s', user.email)
     except User.DoesNotExist:
         pass  # Silent — don't tell attacker the email doesn't exist
 
