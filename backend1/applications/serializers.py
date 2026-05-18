@@ -8,16 +8,19 @@ class ApplicationListSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source="student.user.full_name", read_only=True)
     student_email = serializers.EmailField(source="student.user.email", read_only=True)
     student_id = serializers.IntegerField(source="student.pk", read_only=True)
-    cv_score = serializers.SerializerMethodField()  # ← THIS LINE must be here
+    cv_score = serializers.SerializerMethodField()
+    has_uploaded_convention = serializers.SerializerMethodField()
+    has_report = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
         fields = [
             "id", "offer", "offer_title", "offer_location", "offer_company_name",
             "student_name", "student_email", "student_id",
-            "cv_score",  # ← and here
+            "cv_score",
             "status", "stage_state", "application_date",
             "report_submitted_at", "report_validated_at", "attestation_issued_at",
+            "has_uploaded_convention", "has_report",
         ]
 
     def get_offer_company_name(self, obj):
@@ -27,7 +30,13 @@ class ApplicationListSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
-    def get_cv_score(self, obj):  # ← AND this method must be here
+    def get_has_uploaded_convention(self, obj):
+        return bool(obj.uploaded_convention_file)
+
+    def get_has_report(self, obj):
+        return bool(obj.report_file)
+
+    def get_cv_score(self, obj):
         try:
             s = obj.student
             cv = s.digital_cv

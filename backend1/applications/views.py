@@ -12,6 +12,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators  import api_view, permission_classes
 
 from .models       import Application, CompanyRating
+from users.models import CustomUser
 from .serializers  import (
     ApplicationListSerializer, ApplicationDetailSerializer,
     ApplicationWriteSerializer, ApplicationReviewSerializer,
@@ -272,6 +273,55 @@ def _get_course_suggestions(tech_topic):
 
     except Exception:
         return f"Cherchez des cours sur : {tech_topic}"
+
+
+# ── ADMINISTRATION: REVIEW PENDING APPLICATION (pre-company) ────────────────
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def administration_review_application(request, pk):
+    if request.user.role != 'administration':
+        return fail("Administration only.", status.HTTP_403_FORBIDDEN)
+    application = get_object_or_404(
+        Application.objects.select_related('student__user', 'offer__company__user'),
+        pk=pk,
+    )
+    if application.status not in (Application.Status.PENDING, Application.Status.REVIEWED):
+        return fail(
+            f"Only pending or reviewed applications can be updated. Current: '{application.status}'.",
+            status.HTTP_400_BAD_REQUEST,
+        )
+    action = (request.data.get('action') or '').strip().lower()
+    if action == 'approve':
+        application.status = Application.Status.REVIEWED
+        application.save(update_fields=['status'])
+        Notification.objects.create(
+            recipient=application.offer.company.user,
+            message=(
+                f"Application from {application.student.user.full_name} "
+                f"for '{application.offer.title}' was approved by administration."
+            ),
+        )
+        Notification.objects.create(
+            recipient=application.student.user,
+            message=(
+                f"Your application for '{application.offer.title}' was approved "
+                f"by your university administration."
+            ),
+        )
+        return ok(message="Application approved by administration.", data={'status': application.status})
+    if action == 'refuse':
+        reason = request.data.get('reason', 'No reason provided.')
+        application.status = Application.Status.REFUSED
+        application.save(update_fields=['status'])
+        Notification.objects.create(
+            recipient=application.student.user,
+            message=(
+                f"Your application for '{application.offer.title}' was refused "
+                f"by administration. Reason: {reason}"
+            ),
+        )
+        return ok(message="Application refused.", data={'status': application.status, 'reason': reason})
+    return fail("action must be 'approve' or 'refuse'.")
 
 
 # ── APPLICATIONS SCOPED TO UNIVERSITY (administration role) ─────────────────
@@ -883,6 +933,70 @@ def my_interns(request):
             'report_file': a.report_file.url if a.report_file else None,
         })
     return ok(data=data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_convention(request, pk):
+    if request.user.role != 'student':
+        return fail("Students only.", status.HTTP_403_FORBIDDEN)
+    application = get_object_or_404(
+        Application.objects.select_related('student__user', 'offer'),
+        pk=pk,
+        student=request.user.student,
+    )
+    convention = _get_convention(application)
+    if not convention:
+        return fail("No convention found for this application.")
+    if not convention.admin_signed_at:
+        return fail(
+            "Convention must be fully signed and validated before upload.",
+            status.HTTP_400_BAD_REQUEST,
+        )
+    upload = request.FILES.get('convention_file') or request.FILES.get('file')
+    if not upload:
+        return fail("'convention_file' is required.")
+    application.uploaded_convention_file = upload
+    application.save(update_fields=['uploaded_convention_file'])
+    Notification.objects.create(
+        recipient=application.offer.company.user,
+        message=(
+            f"{application.student.user.full_name} uploaded the signed convention "
+            f"for '{application.offer.title}'."
+        ),
+    )
+    return ok(message="Convention uploaded successfully.")
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_student_attestation(request, pk):
+    if request.user.role != 'student':
+        return fail("Students only.", status.HTTP_403_FORBIDDEN)
+    application = get_object_or_404(
+        Application.objects.select_related('student__user', 'offer__company__user'),
+        pk=pk,
+        student=request.user.student,
+    )
+    if application.stage_state != 'report_validated':
+        return fail(
+            "Attestation upload is available after your report is validated by the company.",
+            status.HTTP_400_BAD_REQUEST,
+        )
+    upload = request.FILES.get('attestation_file') or request.FILES.get('file')
+    if not upload:
+        return fail("'attestation_file' is required.")
+    application.student_attestation_upload = upload
+    application.save(update_fields=['student_attestation_upload'])
+    for admin_user in CustomUser.objects.filter(role='administration', is_active=True):
+        Notification.objects.create(
+            recipient=admin_user,
+            message=(
+                f"{application.student.user.full_name} uploaded an attestation document "
+                f"for '{application.offer.title}'."
+            ),
+        )
+    return ok(message="Attestation document uploaded successfully.")
 
 
 @api_view(['POST'])

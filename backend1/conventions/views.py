@@ -308,6 +308,11 @@ def my_conventions(request):
         'company_signed':   c.company_signed_at is not None,
         'admin_validated':  c.admin_signed_at   is not None,
         'pdf_download_url': f"/api/conventions/{c.pk}/download/",
+        'stage_state':      c.application.stage_state,
+        'report_submitted': bool(c.application.report_file),
+        'report_validated': bool(c.application.report_validated_at),
+        'attestation_issued': bool(c.application.attestation_issued_at),
+        'has_uploaded_convention': bool(c.application.uploaded_convention_file),
     } for c in conventions]
 
     return ok(data=data)
