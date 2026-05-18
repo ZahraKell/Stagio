@@ -21,13 +21,14 @@ logger = logging.getLogger(__name__)
 
 
 def _send_otp_email(user, otp):
-    """Send signup OTP (Resend on Railway, SMTP locally)."""
+    """Send signup OTP (Resend on Railway, SMTP locally). Returns (ok, error_message)."""
     if not email_configured():
-        logger.error(
-            'Signup OTP not sent: configure RESEND_API_KEY + DEFAULT_FROM_EMAIL '
-            '(Railway) or EMAIL_HOST_USER + EMAIL_HOST_PASSWORD (local).'
+        msg = (
+            'Email not configured. Railway: BREVO_API_KEY + BREVO_SENDER_EMAIL, '
+            'or RESEND with a verified domain. Local: EMAIL_HOST_USER + EMAIL_HOST_PASSWORD.'
         )
-        return False
+        logger.error('Signup OTP not sent: %s', msg)
+        return False, msg
 
     subject = '[Stag.io] Confirmation code'
     message = (
@@ -40,10 +41,10 @@ def _send_otp_email(user, otp):
     try:
         send_transactional_email(subject, message, [user.email])
         logger.info('Signup OTP email sent to %s', user.email)
-        return True
-    except Exception:
+        return True, None
+    except Exception as exc:
         logger.exception('Signup OTP email failed for %s', user.email)
-        return False
+        return False, str(exc)
 
 
 
@@ -69,15 +70,16 @@ def register(request):
 
     # Send email after DB commit so SMTP slowness does not hold the transaction
     # or exceed Gunicorn's default 30s worker timeout on Railway.
-    if not _send_otp_email(user, otp):
+    ok, email_error = _send_otp_email(user, otp)
+    if not ok:
         user.delete()
         return Response(
             {
                 'error': (
                     'Account could not be created because the confirmation email '
-                    'could not be sent. On Railway, use Resend (RESEND_API_KEY); '
-                    'locally, use Gmail SMTP.'
+                    'could not be sent.'
                 ),
+                'detail': email_error,
             },
             status=503,
         )
@@ -219,13 +221,12 @@ def resend_signup_otp(request):
         return Response({'error': 'User not found.'}, status=404)
 
     otp = SignupOTP.create_for_user(user)
-    if not _send_otp_email(user, otp):
+    ok, email_error = _send_otp_email(user, otp)
+    if not ok:
         return Response(
             {
-                'error': (
-                    'Could not send the confirmation email. '
-                    'Check server email settings or try again later.'
-                ),
+                'error': 'Could not send the confirmation email.',
+                'detail': email_error,
             },
             status=503,
         )

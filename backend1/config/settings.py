@@ -193,7 +193,12 @@ EMAIL_HOST_PASSWORD = _raw_email_password.replace(' ', '')
 # Gmail SMTP only reliably sends when From matches the authenticated mailbox
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'webmaster@localhost')
 
-# Resend (HTTPS) — required on Railway because outbound SMTP is blocked
+# Brevo (HTTPS) — works on Railway without owning a domain (verify Gmail as sender)
+BREVO_API_KEY = config('BREVO_API_KEY', default='')
+BREVO_SENDER_EMAIL = config('BREVO_SENDER_EMAIL', default='')
+BREVO_SENDER_NAME = config('BREVO_SENDER_NAME', default='Stag.io')
+
+# Resend (HTTPS) — needs a verified domain to email arbitrary recipients
 RESEND_API_KEY = config('RESEND_API_KEY', default='')
 
 # ── External APIs ──────────────────────────────────────────
