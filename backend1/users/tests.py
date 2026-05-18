@@ -1,7 +1,11 @@
+from django.test import override_settings
 from rest_framework.test import APITestCase
 from users.models import CustomUser, Company, SignupOTP
 
+LOC_MEM_EMAIL = {'EMAIL_BACKEND': 'django.core.mail.backends.locmem.EmailBackend'}
 
+
+@override_settings(**LOC_MEM_EMAIL)
 class RegistrationWorkflowTests(APITestCase):
     def test_username_is_auto_generated_from_email(self):
         payload = {

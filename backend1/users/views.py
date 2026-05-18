@@ -6,8 +6,9 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
+from django.core.mail import get_connection, send_mail
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from .serializers import RegisterSerializer, UserSerializer
 from .models import SignupOTP, Company
@@ -44,12 +45,17 @@ def _send_otp_email(user, otp):
     )
 
     try:
+        connection = get_connection(
+            fail_silently=False,
+            timeout=getattr(settings, 'EMAIL_TIMEOUT', 15),
+        )
         send_mail(
             subject,
             message,
             _otp_from_email(),
             [user.email],
             fail_silently=False,
+            connection=connection,
         )
         logger.info('Signup OTP email sent to %s', user.email)
         return True
@@ -63,11 +69,14 @@ def _send_otp_email(user, otp):
 @permission_classes([AllowAny])
 def register(request):
     serializer = RegisterSerializer(data=request.data)
-    if serializer.is_valid():
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+
+    with transaction.atomic():
         user = serializer.save()
         otp = user.signup_otps.first()
-        if otp:
-            _send_otp_email(user, otp)
+        if not otp:
+            raise ValueError('Signup OTP was not created.')
         if user.role == 'company':
             admin_users = User.objects.filter(role='admin', is_active=True)
             for admin in admin_users:
@@ -75,15 +84,31 @@ def register(request):
                     recipient=admin,
                     message=f"New company registration submitted by {user.email}.",
                 )
+
+    # Send email after DB commit so SMTP slowness does not hold the transaction
+    # or exceed Gunicorn's default 30s worker timeout on Railway.
+    if not _send_otp_email(user, otp):
+        user.delete()
         return Response(
             {
-                'message': 'Account created successfully. Please confirm your email using the OTP code.',
-                'username': user.username,
-                'requires_email_verification': True,
+                'error': (
+                    'Account could not be created because the confirmation email '
+                    'could not be sent. Check server email settings (Gmail app password) '
+                    'or try again later.'
+                ),
             },
-            status=201
+            status=503,
         )
-    return Response(serializer.errors, status=400)
+
+    return Response(
+        {
+            'message': 'Account created successfully. Please confirm your email using the OTP code.',
+            'username': user.username,
+            'requires_email_verification': True,
+            'email_sent': True,
+        },
+        status=201,
+    )
 
 
 
@@ -212,7 +237,16 @@ def resend_signup_otp(request):
         return Response({'error': 'User not found.'}, status=404)
 
     otp = SignupOTP.create_for_user(user)
-    _send_otp_email(user, otp)
+    if not _send_otp_email(user, otp):
+        return Response(
+            {
+                'error': (
+                    'Could not send the confirmation email. '
+                    'Check server email settings or try again later.'
+                ),
+            },
+            status=503,
+        )
     return Response({'message': 'A new confirmation code was sent.'})
 # views.py
 from rest_framework_simplejwt.tokens import RefreshToken

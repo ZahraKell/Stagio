@@ -26,11 +26,20 @@ class Command(BaseCommand):
             ))
             return
 
-        send_mail(
-            '[Stag.io] SMTP test',
-            'If you receive this, email delivery is configured correctly.',
-            from_email,
-            [recipient],
-            fail_silently=False,
-        )
+        try:
+            send_mail(
+                '[Stag.io] SMTP test',
+                'If you receive this, email delivery is configured correctly.',
+                from_email,
+                [recipient],
+                fail_silently=False,
+            )
+        except Exception as exc:
+            self.stderr.write(self.style.ERROR(f'SMTP failed: {exc}'))
+            self.stderr.write(
+                'Gmail: enable 2FA, create an App Password at '
+                'https://myaccount.google.com/apppasswords, set EMAIL_HOST_PASSWORD '
+                '(16 chars, no spaces required).'
+            )
+            raise
         self.stdout.write(self.style.SUCCESS(f'Test email sent to {recipient}'))

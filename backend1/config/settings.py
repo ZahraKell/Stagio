@@ -5,14 +5,17 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _csv_env(name, default=''):
+    """Split comma-separated env vars and strip whitespace (Railway-safe)."""
+    return [part.strip() for part in config(name, default=default).split(',') if part.strip()]
+
+
 # ── Security ───────────────────────────────────────────────
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me')
 DEBUG      = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config(
-    'ALLOWED_HOSTS',
-    default='localhost,127.0.0.1'
-).split(',')
+ALLOWED_HOSTS = _csv_env('ALLOWED_HOSTS', 'localhost,127.0.0.1')
 
 # ── Authentication backends ────────────────────────────────
 AUTHENTICATION_BACKENDS = [
@@ -146,14 +149,15 @@ SIMPLE_JWT = {
 }
 
 # ── CORS ───────────────────────────────────────────────────
-# In development allow all, in production allow only your Vercel URL
+# Production: set CORS_ALLOWED_ORIGINS on Railway to your exact Vercel URL, e.g.
+# https://internchips.vercel.app,http://localhost:5173
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    CORS_ALLOWED_ORIGINS = config(
+    CORS_ALLOWED_ORIGINS = _csv_env(
         'CORS_ALLOWED_ORIGINS',
-        default='http://localhost:5173'
-    ).split(',')
+        'http://localhost:5173',
+    )
     CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = [
@@ -176,6 +180,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST    = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT    = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = True
+# Fail fast on Railway instead of hanging until Gunicorn worker timeout
+EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=15, cast=int)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 # Accept either env name (Railway guide used EMAIL_APP_PASSWORD in one place)
 _raw_email_password = config(
