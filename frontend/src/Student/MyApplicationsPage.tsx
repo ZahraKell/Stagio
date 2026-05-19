@@ -24,20 +24,19 @@ interface Application {
   status: AppStatus;
   stage_state: string;
   attestation_issued: boolean;
+  report_submitted_at: string | null;
+  report_validated_at: string | null;
 }
 
 interface ConventionRow {
   id: number;
-  status: string;
+  status: string;           // PENDING_STUDENT | PENDING_COMPANY | PENDING_ADMIN | VALIDATED | REJECTED | DRAFT
   application_id: number;
   student_signed: boolean;
   company_signed: boolean;
   admin_validated: boolean;
   offer_title?: string;
   company_name?: string;
-  report_submitted: boolean;
-  report_validated: boolean;
-  attestation_issued: boolean;
 }
 
 type ApiMyApplicationRow = {
@@ -50,6 +49,8 @@ type ApiMyApplicationRow = {
   application_date?: string | null;
   stage_state?: string | null;
   attestation_issued_at?: string | null;
+  report_submitted_at?: string | null;
+  report_validated_at?: string | null;
 };
 
 /* ══════════════════════════════════════════════════════════
@@ -89,39 +90,58 @@ function mapRow(row: ApiMyApplicationRow): Application {
     status: mapBackendStatus(row.status ?? "pending"),
     stage_state: row.stage_state ?? "",
     attestation_issued: !!row.attestation_issued_at,
+    report_submitted_at: row.report_submitted_at ?? null,
+    report_validated_at: row.report_validated_at ?? null,
   };
 }
 
 /* ══════════════════════════════════════════════════════════
    WORKFLOW STATE HELPERS
-   Determines which buttons to show based on the full state
+   Based on convention status field (authoritative source)
    ══════════════════════════════════════════════════════════ */
 
-/** Step 3: App accepted, convention exists, student hasn't signed yet */
+/** Step 3: App accepted, convention waiting for student signature */
 function needsStudentSignature(app: Application, conv: ConventionRow | undefined): boolean {
-  return app.status === "accepted" && !!conv && !conv.student_signed;
+  if (app.status !== "accepted") return false;
+  if (!conv) return false;
+  return conv.status === "PENDING_STUDENT" || (!conv.student_signed && conv.status !== "VALIDATED");
 }
 
 /** Step 4: Student signed, waiting for company */
 function waitingForCompany(app: Application, conv: ConventionRow | undefined): boolean {
-  return app.status === "accepted" && !!conv && conv.student_signed && !conv.company_signed;
+  if (app.status !== "accepted") return false;
+  if (!conv) return false;
+  return conv.status === "PENDING_COMPANY";
 }
 
 /** Step 5: Company signed, waiting for admin */
 function waitingForAdmin(app: Application, conv: ConventionRow | undefined): boolean {
-  return app.status === "accepted" && !!conv && conv.student_signed && conv.company_signed && !conv.admin_validated;
+  if (app.status !== "accepted") return false;
+  if (!conv) return false;
+  return conv.status === "PENDING_ADMIN";
 }
 
-/** Step 6a: Convention validated, internship in progress, no report yet */
-function conventionValidated(app: Application, conv: ConventionRow | undefined): boolean {
-  return conv?.admin_validated === true &&
-    !["report_to_validate", "report_validated", "completed"].includes(app.stage_state) &&
-    !app.attestation_issued;
+/** Convention is fully validated by admin — internship in progress */
+function isConventionValidated(conv: ConventionRow | undefined): boolean {
+  return conv?.status === "VALIDATED" || conv?.admin_validated === true;
+}
+
+/** Step 6a: Convention validated, no report submitted yet */
+function conventionValidatedNoReport(app: Application, conv: ConventionRow | undefined): boolean {
+  if (!isConventionValidated(conv)) return false;
+  return !app.report_submitted_at && !app.attestation_issued && app.stage_state !== "completed";
 }
 
 /** Step 6b: Report uploaded, waiting for validation */
-function reportUploaded(app: Application): boolean {
-  return app.stage_state === "report_to_validate" || app.stage_state === "report_validated";
+function reportSubmittedPendingValidation(app: Application, conv: ConventionRow | undefined): boolean {
+  if (!isConventionValidated(conv)) return false;
+  return !!app.report_submitted_at && !app.report_validated_at && !app.attestation_issued && app.stage_state !== "completed";
+}
+
+/** Step 6c: Report validated by company, waiting for attestation */
+function reportValidatedPendingAttestation(app: Application, conv: ConventionRow | undefined): boolean {
+  if (!isConventionValidated(conv)) return false;
+  return !!app.report_validated_at && !app.attestation_issued && app.stage_state !== "completed";
 }
 
 /** Step 7: Attestation issued — internship fully complete */
@@ -154,15 +174,94 @@ const tabs: { key: AppStatus | "all"; label: string }[] = [
    ══════════════════════════════════════════════════════════ */
 function buildTimeline(app: Application, conv: ConventionRow | undefined) {
   return [
-    { label: "Application submitted",          date: app.appliedDate, done: true },
-    { label: "Under review",                   date: "—", done: ["review","accepted","validated"].includes(app.status) },
-    { label: app.status === "rejected" ? "Not selected" : "Accepted", date: "—", done: ["accepted","validated"].includes(app.status) || app.status === "rejected" },
-    { label: "Student signed convention",      date: "—", done: !!conv?.student_signed },
-    { label: "Company signed convention",      date: "—", done: !!conv?.company_signed },
-    { label: "Administration validated",       date: "—", done: !!conv?.admin_validated },
-    { label: "Report submitted",               date: "—", done: ["report_to_validate","report_validated","completed"].includes(app.stage_state) },
-    { label: "Attestation issued",             date: "—", done: app.attestation_issued || app.stage_state === "completed" },
+    { label: "Application submitted",          done: true },
+    { label: "Under review",                   done: ["review","accepted","validated"].includes(app.status) },
+    { label: app.status === "rejected" ? "Not selected" : "Accepted by company", done: ["accepted","validated"].includes(app.status) || app.status === "rejected" },
+    { label: "Student signed convention",      done: !!conv?.student_signed },
+    { label: "Company signed convention",      done: !!conv?.company_signed },
+    { label: "Administration validated",       done: !!conv?.admin_validated || conv?.status === "VALIDATED" },
+    { label: "Internship report submitted",    done: !!app.report_submitted_at },
+    { label: "Report validated by company",    done: !!app.report_validated_at },
+    { label: "Attestation issued",             done: app.attestation_issued || app.stage_state === "completed" },
   ];
+}
+
+/* ══════════════════════════════════════════════════════════
+   CONVENTION PREVIEW MODAL (view PDF in browser)
+   ══════════════════════════════════════════════════════════ */
+function ConventionPreviewModal({ convId, onClose }: { convId: number; onClose: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await api.get(`conventions/${convId}/download/`, { responseType: "blob" });
+        const blob = new Blob([response.data as BlobPart], { type: "application/pdf" });
+        setUrl(window.URL.createObjectURL(blob));
+      } catch {
+        setError("Impossible de charger la convention.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+    return () => { if (url) window.URL.revokeObjectURL(url); };
+  }, [convId]);
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+        zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        background: "#fff", borderRadius: 16, width: "90vw", maxWidth: 900,
+        height: "90vh", display: "flex", flexDirection: "column", overflow: "hidden",
+        boxShadow: "0 25px 60px rgba(0,0,0,0.4)",
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "16px 20px", borderBottom: "1px solid #e5e7eb", background: "#f8fafc",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <FileText size={20} style={{ color: "#3b82f6" }} />
+            <span style={{ fontWeight: 700, fontSize: 16, color: "#1e293b" }}>
+              Convention CONV-{String(convId).padStart(4, "0")}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "#f1f5f9", border: "none", borderRadius: 8, padding: "6px 10px",
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 4, color: "#64748b",
+            }}
+          >
+            <X size={16} /> Fermer
+          </button>
+        </div>
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          {loading && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8" }}>
+              <div className="mi-spinner" style={{ marginRight: 12 }} />
+              Chargement de la convention…
+            </div>
+          )}
+          {error && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#ef4444" }}>
+              {error}
+            </div>
+          )}
+          {url && !loading && (
+            <iframe src={url} style={{ width: "100%", height: "100%", border: "none" }} title="Convention PDF" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -210,9 +309,9 @@ function ReportSection({ appId, onRefresh }: { appId: number; onRefresh: () => v
    CONVENTION SIGNING POPUP
    ══════════════════════════════════════════════════════════ */
 function ConventionPopup({
-  conventionId, studentName, offerTitle, companyName, onClose, onSigned,
+  conventionId, offerTitle, companyName, onClose, onSigned,
 }: {
-  conventionId: number; studentName: string; offerTitle: string;
+  conventionId: number; offerTitle: string;
   companyName: string; onClose: () => void; onSigned: () => void;
 }) {
   const [signing, setSigning] = useState(false);
@@ -236,8 +335,14 @@ function ConventionPopup({
   };
 
   return (
-    <div className="conv-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="conv-popup">
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+        zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget && !done) onClose(); }}
+    >
+      <div className="conv-popup" style={{ position: "relative", maxWidth: 520, width: "95vw" }}>
         <div className="conv-head">
           <div className="conv-head-icon">📋</div>
           <div>
@@ -257,7 +362,6 @@ function ConventionPopup({
           <>
             <div className="conv-body">
               <div className="conv-summary">
-                <div className="conv-summary-item"><span>Stagiaire</span><strong>{studentName || "Vous"}</strong></div>
                 <div className="conv-summary-item"><span>Entreprise</span><strong>{companyName}</strong></div>
                 <div className="conv-summary-item"><span>Réf. Convention</span><strong>CONV-{String(conventionId).padStart(4, "0")}</strong></div>
               </div>
@@ -306,11 +410,14 @@ function ConventionPopup({
 }
 
 /* ══════════════════════════════════════════════════════════
-   STATUS MESSAGE (waiting states)
+   WAITING BADGE
    ══════════════════════════════════════════════════════════ */
-function WaitingBadge({ icon, text }: { icon: React.ReactNode; text: string }) {
+function WaitingBadge({ icon, text, color }: { icon: React.ReactNode; text: string; color?: string }) {
   return (
-    <div className="app-no-convention" style={{ color: "var(--sc-warn)", borderColor: "var(--sc-warn)" }}>
+    <div
+      className="app-no-convention"
+      style={{ color: color || "var(--sc-warn)", borderColor: color || "var(--sc-warn)" }}
+    >
       {icon} {text}
     </div>
   );
@@ -326,6 +433,7 @@ const ApplicationsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppStatus | "all">("all");
   const [modal, setModal] = useState<Application | null>(null);
   const [signTarget, setSignTarget] = useState<{ app: Application; conv: ConventionRow } | null>(null);
+  const [previewConvId, setPreviewConvId] = useState<number | null>(null);
 
   /* ── Load ── */
   const loadAll = async () => {
@@ -370,7 +478,7 @@ const ApplicationsPage: React.FC = () => {
   const handleDownloadConvention = async (convId: number) => {
     try {
       const response = await api.get(`conventions/${convId}/download/`, { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const url = window.URL.createObjectURL(new Blob([response.data as BlobPart]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `convention_${convId}.pdf`);
@@ -383,20 +491,10 @@ const ApplicationsPage: React.FC = () => {
     }
   };
 
-  const handlePreviewConvention = async (convId: number) => {
-    try {
-      const response = await api.get(`conventions/${convId}/download/`, { responseType: "blob" });
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      window.open(window.URL.createObjectURL(blob), "_blank");
-    } catch {
-      toast.error("Impossible d'afficher la convention.");
-    }
-  };
-
   const handleDownloadAttestation = async (appId: number) => {
     try {
       const response = await api.get(`applications/${appId}/attestation/`, { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const url = window.URL.createObjectURL(new Blob([response.data as BlobPart]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `attestation_${appId}.pdf`);
@@ -412,12 +510,12 @@ const ApplicationsPage: React.FC = () => {
   const modalConv = modal ? conventions.find((c) => c.application_id === modal.id) : undefined;
 
   /* ════════════════════════════════════════════════════════
-     BUTTON RENDERER — single source of truth for all states
+     CARD ACTION BUTTONS — compact row on the card
      ════════════════════════════════════════════════════════ */
   function renderCardActions(app: Application) {
     const conv = conventions.find((c) => c.application_id === app.id);
 
-    // STEP 3 — Sign convention (student hasn't signed yet)
+    // STEP 3 — Needs student signature
     if (needsStudentSignature(app, conv)) {
       return (
         <>
@@ -431,36 +529,32 @@ const ApplicationsPage: React.FC = () => {
       );
     }
 
-    // STEP 4 — Waiting for company
+    // STEP 4 — Waiting for company signature
     if (waitingForCompany(app, conv)) {
       return (
-        <>
-          <button className="app-view-btn" onClick={() => setModal(app)}>
-            <Eye size={14} /> Voir <ChevronRight size={13} />
-          </button>
-        </>
+        <button className="app-view-btn" onClick={() => setModal(app)}>
+          <Eye size={14} /> Voir <ChevronRight size={13} />
+        </button>
       );
     }
 
-    // STEP 5 — Waiting for admin
+    // STEP 5 — Waiting for admin validation
     if (waitingForAdmin(app, conv)) {
       return (
-        <>
-          <button className="app-view-btn" onClick={() => setModal(app)}>
-            <Eye size={14} /> Voir <ChevronRight size={13} />
-          </button>
-        </>
+        <button className="app-view-btn" onClick={() => setModal(app)}>
+          <Eye size={14} /> Voir <ChevronRight size={13} />
+        </button>
       );
     }
 
-    // STEP 7 — Attestation issued (fully complete)
-    if (attestationIssued(app) && conv?.admin_validated) {
+    // STEP 7 — Attestation fully issued
+    if (attestationIssued(app) && isConventionValidated(conv)) {
       return (
         <>
-          <button className="sc-btn-download" onClick={() => handleDownloadAttestation(app.id)}>
+          <button className="sc-btn-download" style={{ background: "#22c55e", color: "#fff" }} onClick={() => handleDownloadAttestation(app.id)}>
             <Award size={13} /> Attestation
           </button>
-          <button className="sc-btn-download" onClick={() => handleDownloadConvention(conv!.id)}>
+          <button className="sc-btn-download" onClick={() => conv && handleDownloadConvention(conv.id)}>
             <Download size={13} /> Convention
           </button>
           <button className="app-view-btn" onClick={() => setModal(app)}>
@@ -470,11 +564,25 @@ const ApplicationsPage: React.FC = () => {
       );
     }
 
-    // STEP 6b — Report uploaded, waiting for validation
-    if (reportUploaded(app) && conv?.admin_validated) {
+    // STEP 6c — Report validated, waiting for attestation
+    if (reportValidatedPendingAttestation(app, conv)) {
       return (
         <>
-          <button className="sc-btn-download" onClick={() => handleDownloadConvention(conv!.id)}>
+          <button className="sc-btn-download" onClick={() => conv && handleDownloadConvention(conv.id)}>
+            <Download size={13} /> Convention
+          </button>
+          <button className="app-view-btn" onClick={() => setModal(app)}>
+            <Eye size={14} /> Voir <ChevronRight size={13} />
+          </button>
+        </>
+      );
+    }
+
+    // STEP 6b — Report submitted, waiting for company validation
+    if (reportSubmittedPendingValidation(app, conv)) {
+      return (
+        <>
+          <button className="sc-btn-download" onClick={() => conv && handleDownloadConvention(conv.id)}>
             <Download size={13} /> Convention
           </button>
           <button className="app-view-btn" onClick={() => setModal(app)}>
@@ -485,11 +593,14 @@ const ApplicationsPage: React.FC = () => {
     }
 
     // STEP 6a — Convention validated, can upload report
-    if (conventionValidated(app, conv)) {
+    if (conventionValidatedNoReport(app, conv)) {
       return (
         <>
-          <button className="sc-btn-download" onClick={() => handleDownloadConvention(conv!.id)}>
-            <Download size={13} /> Convention
+          <button className="sc-btn-download" onClick={() => conv && setPreviewConvId(conv.id)}>
+            <Eye size={13} /> Convention
+          </button>
+          <button className="sc-btn-download" onClick={() => conv && handleDownloadConvention(conv.id)}>
+            <Download size={13} /> Télécharger
           </button>
           <button className="app-view-btn" onClick={() => setModal(app)}>
             <Eye size={14} /> Voir <ChevronRight size={13} />
@@ -507,7 +618,7 @@ const ApplicationsPage: React.FC = () => {
   }
 
   /* ════════════════════════════════════════════════════════
-     MODAL CTA RENDERER
+     MODAL CTA — full action buttons inside detail modal
      ════════════════════════════════════════════════════════ */
   function renderModalCTA(app: Application, conv: ConventionRow | undefined) {
 
@@ -533,8 +644,8 @@ const ApplicationsPage: React.FC = () => {
       return <WaitingBadge icon={<Clock size={16} />} text="En attente de validation par l'administration…" />;
     }
 
-    // STEP 7 — Attestation issued (fully complete)
-    if (attestationIssued(app) && conv?.admin_validated) {
+    // STEP 7 — Attestation issued
+    if (attestationIssued(app) && isConventionValidated(conv)) {
       return (
         <>
           <button
@@ -547,35 +658,57 @@ const ApplicationsPage: React.FC = () => {
           <button
             className="sc-btn-primary off-apply-full"
             style={{ background: "#3b82f6" }}
-            onClick={() => handlePreviewConvention(conv!.id)}
+            onClick={() => conv && setPreviewConvId(conv.id)}
           >
             <Eye size={16} /> Voir la convention
           </button>
-          <button className="sc-btn-primary off-apply-full" onClick={() => handleDownloadConvention(conv!.id)}>
+          <button className="sc-btn-primary off-apply-full" onClick={() => conv && handleDownloadConvention(conv.id)}>
             <Download size={16} /> Télécharger la convention
           </button>
         </>
       );
     }
 
-    // STEP 6b — Report uploaded, waiting validation
-    if (reportUploaded(app) && conv?.admin_validated) {
+    // STEP 6c — Report validated, waiting for attestation
+    if (reportValidatedPendingAttestation(app, conv)) {
       return (
         <>
-          <div className="app-no-convention" style={{ color: "#8b5cf6", borderColor: "#8b5cf6" }}>
-            <ScrollText size={16} />
-            {app.stage_state === "report_validated"
-              ? "Rapport validé par l'entreprise — en attente de l'attestation"
-              : "Rapport soumis — en attente de validation par l'entreprise"}
-          </div>
+          <WaitingBadge
+            icon={<ScrollText size={16} />}
+            text="Rapport validé par l'entreprise — en attente de l'attestation de l'administration"
+            color="#8b5cf6"
+          />
           <button
             className="sc-btn-primary off-apply-full"
             style={{ background: "#3b82f6" }}
-            onClick={() => handlePreviewConvention(conv!.id)}
+            onClick={() => conv && setPreviewConvId(conv.id)}
           >
             <Eye size={16} /> Voir la convention
           </button>
-          <button className="sc-btn-primary off-apply-full" onClick={() => handleDownloadConvention(conv!.id)}>
+          <button className="sc-btn-primary off-apply-full" onClick={() => conv && handleDownloadConvention(conv.id)}>
+            <Download size={16} /> Télécharger la convention
+          </button>
+        </>
+      );
+    }
+
+    // STEP 6b — Report submitted, waiting for company
+    if (reportSubmittedPendingValidation(app, conv)) {
+      return (
+        <>
+          <WaitingBadge
+            icon={<ScrollText size={16} />}
+            text="Rapport soumis — en attente de validation par l'entreprise"
+            color="#f59e0b"
+          />
+          <button
+            className="sc-btn-primary off-apply-full"
+            style={{ background: "#3b82f6" }}
+            onClick={() => conv && setPreviewConvId(conv.id)}
+          >
+            <Eye size={16} /> Voir la convention
+          </button>
+          <button className="sc-btn-primary off-apply-full" onClick={() => conv && handleDownloadConvention(conv.id)}>
             <Download size={16} /> Télécharger la convention
           </button>
         </>
@@ -583,17 +716,17 @@ const ApplicationsPage: React.FC = () => {
     }
 
     // STEP 6a — Convention validated, upload report
-    if (conventionValidated(app, conv)) {
+    if (conventionValidatedNoReport(app, conv)) {
       return (
         <>
           <button
             className="sc-btn-primary off-apply-full"
             style={{ background: "#3b82f6" }}
-            onClick={() => handlePreviewConvention(conv!.id)}
+            onClick={() => conv && setPreviewConvId(conv.id)}
           >
             <Eye size={16} /> Voir la convention
           </button>
-          <button className="sc-btn-primary off-apply-full" onClick={() => handleDownloadConvention(conv!.id)}>
+          <button className="sc-btn-primary off-apply-full" onClick={() => conv && handleDownloadConvention(conv.id)}>
             <Download size={16} /> Télécharger la convention
           </button>
           <ReportSection appId={app.id} onRefresh={loadAll} />
@@ -714,12 +847,13 @@ const ApplicationsPage: React.FC = () => {
         </AnimatePresence>
       )}
 
-      {/* ── MODAL — centered with fixed positioning ── */}
+      {/* ── DETAIL MODAL — fixed center ── */}
       <AnimatePresence>
         {modal && (
           <>
             <motion.div
               className="off-modal-backdrop"
+              style={{ position: "fixed", inset: 0, zIndex: 999 }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -733,12 +867,13 @@ const ApplicationsPage: React.FC = () => {
                 left: "50%",
                 transform: "translate(-50%, -50%)",
                 zIndex: 1000,
-                maxHeight: "90vh",
+                maxHeight: "85vh",
                 overflowY: "auto",
+                width: "min(640px, 94vw)",
               }}
-              initial={{ opacity: 0, scale: 0.93 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.93 }}
+              initial={{ opacity: 0, scale: 0.93, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.93, y: 20 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
             >
               {/* Header */}
@@ -773,7 +908,6 @@ const ApplicationsPage: React.FC = () => {
                       {idx < arr.length - 1 && <div className={`app-tl-line ${ev.done ? "done" : ""}`} />}
                       <div className="app-tl-content">
                         <span className="app-tl-label">{ev.label}</span>
-                        <span className="app-tl-date">{ev.date}</span>
                       </div>
                     </div>
                   ))}
@@ -792,11 +926,24 @@ const ApplicationsPage: React.FC = () => {
                     <div className="off-mdetail">
                       <span>Convention</span>
                       <strong>
-                        {modalConv.admin_validated ? "✅ Validée" :
-                         modalConv.company_signed  ? "⏳ En attente admin" :
-                         modalConv.student_signed  ? "⏳ En attente entreprise" :
-                                                     "⏳ En attente de votre signature"}
+                        {modalConv.status === "VALIDATED" ? "✅ Validée" :
+                         modalConv.status === "PENDING_ADMIN" ? "⏳ En attente admin" :
+                         modalConv.status === "PENDING_COMPANY" ? "⏳ En attente entreprise" :
+                         modalConv.status === "PENDING_STUDENT" ? "⏳ En attente de votre signature" :
+                         modalConv.status}
                       </strong>
+                    </div>
+                  )}
+                  {modal.report_submitted_at && (
+                    <div className="off-mdetail">
+                      <span>Rapport soumis</span>
+                      <strong>{formatDate(modal.report_submitted_at)}</strong>
+                    </div>
+                  )}
+                  {modal.report_validated_at && (
+                    <div className="off-mdetail">
+                      <span>Rapport validé</span>
+                      <strong>{formatDate(modal.report_validated_at)}</strong>
                     </div>
                   )}
                 </div>
@@ -816,11 +963,18 @@ const ApplicationsPage: React.FC = () => {
       {signTarget && (
         <ConventionPopup
           conventionId={signTarget.conv.id}
-          studentName=""
           offerTitle={signTarget.app.title}
           companyName={signTarget.app.company}
           onClose={() => setSignTarget(null)}
           onSigned={() => void handleSigned()}
+        />
+      )}
+
+      {/* CONVENTION PREVIEW MODAL */}
+      {previewConvId !== null && (
+        <ConventionPreviewModal
+          convId={previewConvId}
+          onClose={() => setPreviewConvId(null)}
         />
       )}
     </DashboardLayout>

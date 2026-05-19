@@ -3,8 +3,8 @@ import DashboardLayout from "../components/DashboardLayout";
 import {
   CheckCircle, XCircle, RefreshCw, X, AlertTriangle,
   ArrowRight, FileText, Clock, CheckSquare, XSquare, User,
-  GraduationCap, Briefcase, Globe, Phone, Mail, Star,
-  Code2, Languages, BookOpen,
+  GraduationCap, Briefcase, Globe, Mail, Star,
+  Code2, Languages, BookOpen, ChevronRight,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../api";
@@ -27,7 +27,6 @@ interface AppRow {
 }
 
 interface StudentCV {
-  // profile
   full_name: string;
   email: string;
   phone?: string;
@@ -36,15 +35,14 @@ interface StudentCV {
   field?: string;
   speciality?: string;
   cv_score?: number;
-  // digital cv
   description?: string;
   github?: string;
   linkedin?: string;
   portfolio?: string;
-  skills?: { name: string; level?: string }[];
-  educations?: { school: string; degree?: string; field?: string; start_year?: number; end_year?: number }[];
-  experiences?: { job_title: string; company: string; location?: string; start_date?: string; end_date?: string; description?: string }[];
-  languages?: { language: string; level?: string }[];
+  skills?: { id?: number; name: string; level?: string }[];
+  educations?: { id?: number; school: string; degree?: string; field?: string; start_year?: number; end_year?: number }[];
+  experiences?: { id?: number; job_title: string; company: string; location?: string; start_date?: string; end_date?: string; description?: string }[];
+  languages?: { id?: number; language: string; level?: string }[];
 }
 
 function unwrapApps(res: { data: unknown }): AppRow[] {
@@ -53,7 +51,7 @@ function unwrapApps(res: { data: unknown }): AppRow[] {
 }
 
 /* ══════════════════════════════════════════════════════════
-   CV PREVIEW MODAL
+   CV PREVIEW MODAL — fetches full student profile
    ══════════════════════════════════════════════════════════ */
 function CVModal({ app, onClose }: { app: AppRow; onClose: () => void }) {
   const [cv, setCV] = useState<StudentCV | null>(null);
@@ -61,27 +59,50 @@ function CVModal({ app, onClose }: { app: AppRow; onClose: () => void }) {
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
       try {
-        // Try fetching student detail via application detail
-        const res = await api.get(`applications/${app.id}/`);
-        const d = (res.data as { data?: unknown })?.data ?? res.data;
-        // Build a partial CV from what we have
-        const partial: StudentCV = {
-          full_name:   (d as AppRow).student_name || app.student_name,
-          email:       (d as AppRow).student_email || app.student_email,
-          cv_score:    app.cv_score,
-          institution: (d as { institution?: string }).institution,
-          grade:       (d as { grade?: string }).grade,
-          field:       (d as { field?: string }).field,
-          speciality:  (d as { speciality?: string }).speciality,
+        // First try to get the full student digital CV
+        // The student_id comes from the app row; fetch via students endpoint
+        let fullCV: StudentCV = {
+          full_name: app.student_name,
+          email: app.student_email,
+          cv_score: app.cv_score,
         };
-        setCV(partial);
+
+        // Try fetching the student's full profile via their digital CV
+        // Endpoint: GET /api/users/students/{student_id}/cv/  or  /api/users/cv/{student_id}/
+        // We try multiple possible endpoints
+        if (app.student_id) {
+          try {
+            const cvRes = await api.get(`users/students/${app.student_id}/cv/`);
+            const d = (cvRes.data as { data?: unknown })?.data ?? cvRes.data;
+            fullCV = { ...fullCV, ...(d as Partial<StudentCV>) };
+          } catch {
+            // try alternate endpoint
+            try {
+              const cvRes2 = await api.get(`users/digital-cv/${app.student_id}/`);
+              const d2 = (cvRes2.data as { data?: unknown })?.data ?? cvRes2.data;
+              fullCV = { ...fullCV, ...(d2 as Partial<StudentCV>) };
+            } catch {
+              // fallback: use application detail which has some student info
+              const appRes = await api.get(`applications/${app.id}/`);
+              const d3 = (appRes.data as { data?: unknown })?.data ?? appRes.data;
+              fullCV = { ...fullCV, ...(d3 as Partial<StudentCV>) };
+            }
+          }
+        } else {
+          // No student_id, fetch from application detail
+          const appRes = await api.get(`applications/${app.id}/`);
+          const d = (appRes.data as { data?: unknown })?.data ?? appRes.data;
+          fullCV = { ...fullCV, ...(d as Partial<StudentCV>) };
+        }
+
+        setCV(fullCV);
       } catch {
-        // fallback: build from app row
         setCV({
           full_name: app.student_name,
-          email:     app.student_email,
-          cv_score:  app.cv_score,
+          email: app.student_email,
+          cv_score: app.cv_score,
         });
       } finally {
         setLoading(false);
@@ -92,241 +113,300 @@ function CVModal({ app, onClose }: { app: AppRow; onClose: () => void }) {
 
   const score = cv?.cv_score ?? app.cv_score ?? 0;
   const scoreColor = score >= 70 ? "#22c55e" : score >= 40 ? "#f59e0b" : "#ef4444";
+  const scoreLabel = score >= 70 ? "Profil complet et solide" : score >= 40 ? "Profil à compléter" : "Profil incomplet";
 
   return (
     <div
-      className="conv-overlay"
-      style={{ zIndex: 1100 }}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)",
+        zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "20px",
+      }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="conv-popup"
         style={{
-          maxWidth: 600,
-          maxHeight: "85vh",
-          overflowY: "auto",
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
+          background: "#fff", borderRadius: 20, width: "100%", maxWidth: 640,
+          maxHeight: "88vh", display: "flex", flexDirection: "column",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
+          overflow: "hidden",
         }}
       >
-        {/* Header */}
-        <div className="conv-head">
-          <div className="conv-head-icon" style={{ background: "#eff6ff", color: "#2563eb", fontSize: 22 }}>
-            <User size={22} />
+        {/* ── Modal Header ── */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 14,
+          padding: "20px 24px", borderBottom: "1px solid #f1f5f9",
+          background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)",
+          flexShrink: 0,
+        }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: "50%",
+            background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontWeight: 700, fontSize: 18, flexShrink: 0,
+          }}>
+            {app.student_name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
           </div>
-          <div>
-            <h3>{app.student_name}</h3>
-            <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>{app.student_email}</p>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>{app.student_name}</h3>
+            <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>{app.student_email}</p>
           </div>
-          <button className="conv-close" onClick={onClose}><X size={16} /></button>
+          <button
+            onClick={onClose}
+            style={{
+              background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+              padding: "8px 12px", cursor: "pointer", display: "flex",
+              alignItems: "center", gap: 6, color: "#64748b", fontSize: 13, fontWeight: 600,
+              transition: "all 0.15s",
+            }}
+          >
+            <X size={15} /> Fermer
+          </button>
         </div>
 
-        {loading ? (
-          <div style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>
-            <div className="mi-spinner" style={{ margin: "0 auto 12px" }} />
-            Chargement du CV…
-          </div>
-        ) : (
-          <div className="conv-body" style={{ padding: "0 20px 20px" }}>
-
-            {/* CV Score */}
-            <div style={{
-              background: "#f8fafc", border: `2px solid ${scoreColor}`,
-              borderRadius: 12, padding: "16px 20px", marginBottom: 20,
-              display: "flex", alignItems: "center", gap: 16,
-            }}>
+        {/* ── Scrollable Body ── */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
+          {loading ? (
+            <div style={{ padding: "40px 0", textAlign: "center", color: "#94a3b8" }}>
+              <div className="mi-spinner" style={{ margin: "0 auto 14px" }} />
+              <p style={{ margin: 0 }}>Chargement du profil étudiant…</p>
+            </div>
+          ) : (
+            <>
+              {/* CV Score */}
               <div style={{
-                width: 56, height: 56, borderRadius: "50%",
-                background: scoreColor, color: "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontWeight: 700, fontSize: 18, flexShrink: 0,
+                background: `linear-gradient(135deg, ${scoreColor}12 0%, ${scoreColor}06 100%)`,
+                border: `2px solid ${scoreColor}40`,
+                borderRadius: 16, padding: "18px 22px", marginBottom: 24,
+                display: "flex", alignItems: "center", gap: 18,
               }}>
-                {score}
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>Score CV</div>
-                <div style={{ color: "#64748b", fontSize: 13 }}>
-                  {score >= 70 ? "Profil complet et solide" : score >= 40 ? "Profil à compléter" : "Profil incomplet"}
+                <div style={{
+                  width: 64, height: 64, borderRadius: "50%",
+                  background: `linear-gradient(135deg, ${scoreColor}, ${scoreColor}cc)`,
+                  color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontWeight: 800, fontSize: 22, flexShrink: 0,
+                  boxShadow: `0 4px 14px ${scoreColor}40`,
+                }}>
+                  {score}
                 </div>
-                {/* Score bar */}
-                <div style={{ width: 200, height: 6, background: "#e2e8f0", borderRadius: 3, marginTop: 6 }}>
-                  <div style={{ width: `${score}%`, height: "100%", background: scoreColor, borderRadius: 3, transition: "width 0.5s" }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 2 }}>Score CV</div>
+                  <div style={{ color: "#64748b", fontSize: 13, marginBottom: 8 }}>{scoreLabel}</div>
+                  <div style={{ width: "100%", height: 8, background: "#e2e8f0", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{
+                      width: `${score}%`, height: "100%",
+                      background: `linear-gradient(90deg, ${scoreColor}, ${scoreColor}cc)`,
+                      borderRadius: 4, transition: "width 0.6s ease",
+                    }} />
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  {[1,2,3,4,5].map(i => (
+                    <Star
+                      key={i}
+                      size={16}
+                      fill={i <= Math.round(score / 20) ? scoreColor : "transparent"}
+                      stroke={scoreColor}
+                      style={{ display: "inline" }}
+                    />
+                  ))}
                 </div>
               </div>
-            </div>
 
-            {/* Basic info */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94a3b8", marginBottom: 8, letterSpacing: 1 }}>
-                Informations personnelles
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {/* Personal Info */}
+              <SectionTitle icon={<User size={14} />} label="Informations personnelles" />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
                 {[
-                  { icon: <Mail size={14} />,         label: "Email",       value: cv?.email },
-                  { icon: <GraduationCap size={14} />, label: "Établissement", value: cv?.institution },
-                  { icon: <BookOpen size={14} />,      label: "Niveau",      value: cv?.grade },
-                  { icon: <Briefcase size={14} />,     label: "Spécialité",  value: cv?.speciality || cv?.field },
+                  { icon: <Mail size={13} />,          label: "Email",          value: cv?.email },
+                  { icon: <GraduationCap size={13} />, label: "Établissement",  value: cv?.institution },
+                  { icon: <BookOpen size={13} />,      label: "Niveau",         value: cv?.grade },
+                  { icon: <Briefcase size={13} />,     label: "Filière",        value: cv?.field },
+                  { icon: <ChevronRight size={13} />,  label: "Spécialité",     value: cv?.speciality },
                 ].filter(i => i.value).map((item, idx) => (
-                  <div key={idx} style={{
-                    background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8,
-                    padding: "8px 12px", display: "flex", alignItems: "flex-start", gap: 8,
+                  <InfoCard key={idx} icon={item.icon} label={item.label} value={item.value!} />
+                ))}
+              </div>
+
+              {/* Links */}
+              {(cv?.github || cv?.linkedin || cv?.portfolio) && (
+                <>
+                  <SectionTitle icon={<Globe size={14} />} label="Liens" />
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+                    {cv?.github && <LinkPill href={cv.github} label="GitHub" />}
+                    {cv?.linkedin && <LinkPill href={cv.linkedin} label="LinkedIn" />}
+                    {cv?.portfolio && <LinkPill href={cv.portfolio} label="Portfolio" />}
+                  </div>
+                </>
+              )}
+
+              {/* Description */}
+              {cv?.description && (
+                <>
+                  <SectionTitle icon={<FileText size={14} />} label="À propos" />
+                  <div style={{
+                    background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12,
+                    padding: "14px 16px", fontSize: 13, color: "#475569",
+                    lineHeight: 1.7, marginBottom: 20,
                   }}>
-                    <span style={{ color: "#3b82f6", flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
-                    <div>
-                      <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase" }}>{item.label}</div>
-                      <div style={{ fontSize: 13, color: "#1e293b", fontWeight: 500, marginTop: 1 }}>{item.value}</div>
-                    </div>
+                    {cv.description}
                   </div>
-                ))}
-              </div>
-            </div>
+                </>
+              )}
 
-            {/* Description */}
-            {cv?.description && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94a3b8", marginBottom: 8, letterSpacing: 1 }}>
-                  À propos
-                </div>
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#475569", lineHeight: 1.6 }}>
-                  {cv.description}
-                </div>
-              </div>
-            )}
-
-            {/* Links */}
-            {(cv?.github || cv?.linkedin || cv?.portfolio) && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94a3b8", marginBottom: 8, letterSpacing: 1 }}>
-                  Liens
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {cv?.github && (
-                    <a href={cv.github} target="_blank" rel="noreferrer" style={{
-                      padding: "6px 12px", borderRadius: 6, border: "1px solid #e2e8f0",
-                      fontSize: 13, color: "#3b82f6", display: "flex", alignItems: "center", gap: 6,
-                      textDecoration: "none", background: "#fff",
-                    }}>
-                      <Globe size={13} /> GitHub
-                    </a>
-                  )}
-                  {cv?.linkedin && (
-                    <a href={cv.linkedin} target="_blank" rel="noreferrer" style={{
-                      padding: "6px 12px", borderRadius: 6, border: "1px solid #e2e8f0",
-                      fontSize: 13, color: "#3b82f6", display: "flex", alignItems: "center", gap: 6,
-                      textDecoration: "none", background: "#fff",
-                    }}>
-                      <Globe size={13} /> LinkedIn
-                    </a>
-                  )}
-                  {cv?.portfolio && (
-                    <a href={cv.portfolio} target="_blank" rel="noreferrer" style={{
-                      padding: "6px 12px", borderRadius: 6, border: "1px solid #e2e8f0",
-                      fontSize: 13, color: "#3b82f6", display: "flex", alignItems: "center", gap: 6,
-                      textDecoration: "none", background: "#fff",
-                    }}>
-                      <Globe size={13} /> Portfolio
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Skills */}
-            {cv?.skills && cv.skills.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94a3b8", marginBottom: 8, letterSpacing: 1 }}>
-                  <Code2 size={12} style={{ display: "inline", marginRight: 4 }} />Compétences
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {cv.skills.map((s, i) => (
-                    <span key={i} style={{
-                      padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 500,
-                      background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe",
-                    }}>
-                      {s.name}{s.level ? ` · ${s.level}` : ""}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Education */}
-            {cv?.educations && cv.educations.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94a3b8", marginBottom: 8, letterSpacing: 1 }}>
-                  <GraduationCap size={12} style={{ display: "inline", marginRight: 4 }} />Formation
-                </div>
-                {cv.educations.map((e, i) => (
-                  <div key={i} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 6 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b" }}>{e.school}</div>
-                    {e.degree && <div style={{ fontSize: 12, color: "#64748b" }}>{e.degree}{e.field ? ` — ${e.field}` : ""}</div>}
-                    {(e.start_year || e.end_year) && (
-                      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                        {e.start_year} {e.end_year ? `— ${e.end_year}` : "— Présent"}
-                      </div>
-                    )}
+              {/* Skills */}
+              {cv?.skills && cv.skills.length > 0 && (
+                <>
+                  <SectionTitle icon={<Code2 size={14} />} label="Compétences" />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+                    {cv.skills.map((s, i) => (
+                      <span key={i} style={{
+                        padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                        background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe",
+                      }}>
+                        {s.name}{s.level ? <span style={{ opacity: 0.7, fontWeight: 400 }}> · {s.level}</span> : ""}
+                      </span>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                </>
+              )}
 
-            {/* Experience */}
-            {cv?.experiences && cv.experiences.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94a3b8", marginBottom: 8, letterSpacing: 1 }}>
-                  <Briefcase size={12} style={{ display: "inline", marginRight: 4 }} />Expériences
-                </div>
-                {cv.experiences.map((e, i) => (
-                  <div key={i} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", marginBottom: 6 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b" }}>{e.job_title}</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>{e.company}{e.location ? ` · ${e.location}` : ""}</div>
-                    {(e.start_date || e.end_date) && (
-                      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                        {e.start_date} {e.end_date ? `— ${e.end_date}` : "— Présent"}
-                      </div>
-                    )}
-                    {e.description && <div style={{ fontSize: 12, color: "#475569", marginTop: 6, lineHeight: 1.5 }}>{e.description}</div>}
+              {/* Education */}
+              {cv?.educations && cv.educations.length > 0 && (
+                <>
+                  <SectionTitle icon={<GraduationCap size={14} />} label="Formation" />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+                    {cv.educations.map((e, i) => (
+                      <TimelineCard
+                        key={i}
+                        title={e.school}
+                        subtitle={e.degree ? `${e.degree}${e.field ? ` — ${e.field}` : ""}` : e.field}
+                        period={e.start_year ? `${e.start_year}${e.end_year ? ` — ${e.end_year}` : " — Présent"}` : undefined}
+                        color="#6366f1"
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                </>
+              )}
 
-            {/* Languages */}
-            {cv?.languages && cv.languages.length > 0 && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#94a3b8", marginBottom: 8, letterSpacing: 1 }}>
-                  <Languages size={12} style={{ display: "inline", marginRight: 4 }} />Langues
+              {/* Experience */}
+              {cv?.experiences && cv.experiences.length > 0 && (
+                <>
+                  <SectionTitle icon={<Briefcase size={14} />} label="Expériences" />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+                    {cv.experiences.map((e, i) => (
+                      <TimelineCard
+                        key={i}
+                        title={e.job_title}
+                        subtitle={`${e.company}${e.location ? ` · ${e.location}` : ""}`}
+                        period={e.start_date ? `${e.start_date}${e.end_date ? ` — ${e.end_date}` : " — Présent"}` : undefined}
+                        description={e.description}
+                        color="#f59e0b"
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Languages */}
+              {cv?.languages && cv.languages.length > 0 && (
+                <>
+                  <SectionTitle icon={<Languages size={14} />} label="Langues" />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                    {cv.languages.map((l, i) => (
+                      <span key={i} style={{
+                        padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                        background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0",
+                      }}>
+                        {l.language}{l.level ? <span style={{ opacity: 0.7, fontWeight: 400 }}> · {l.level}</span> : ""}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Fallback if no detailed data */}
+              {!cv?.description && !cv?.skills?.length && !cv?.educations?.length && !cv?.experiences?.length && (
+                <div style={{
+                  textAlign: "center", color: "#94a3b8", padding: "32px 0", fontSize: 13,
+                  background: "#f8fafc", borderRadius: 12, border: "1px dashed #e2e8f0",
+                }}>
+                  <User size={36} style={{ margin: "0 auto 10px", display: "block", opacity: 0.35 }} />
+                  <p style={{ margin: 0, lineHeight: 1.6 }}>
+                    Les détails complets du CV ne sont pas disponibles pour cet étudiant.<br />
+                    Le score de <strong style={{ color: scoreColor }}>{score}/100</strong> est calculé depuis les données du profil.
+                  </p>
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {cv.languages.map((l, i) => (
-                    <span key={i} style={{
-                      padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 500,
-                      background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0",
-                    }}>
-                      {l.language}{l.level ? ` · ${l.level}` : ""}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Fallback if very little data */}
-            {!cv?.description && !cv?.skills?.length && !cv?.educations?.length && !cv?.experiences?.length && (
-              <div style={{ textAlign: "center", color: "#94a3b8", padding: "24px 0", fontSize: 13 }}>
-                <User size={32} style={{ margin: "0 auto 8px", display: "block", opacity: 0.4 }} />
-                Les détails complets du CV ne sont pas disponibles via cette vue.<br />
-                Le score affiché est calculé depuis les données du profil.
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="conv-footer">
-          <button className="conv-btn-cancel" onClick={onClose}>Fermer</button>
+              )}
+            </>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Small sub-components for the CV modal ── */
+function SectionTitle({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 6,
+      fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const,
+      color: "#94a3b8", letterSpacing: "0.08em", marginBottom: 10,
+    }}>
+      {icon} {label}
+    </div>
+  );
+}
+
+function InfoCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div style={{
+      background: "#fff", border: "1px solid #f1f5f9", borderRadius: 10,
+      padding: "10px 14px", display: "flex", alignItems: "flex-start", gap: 10,
+      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+    }}>
+      <span style={{ color: "#3b82f6", flexShrink: 0, marginTop: 2 }}>{icon}</span>
+      <div>
+        <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+        <div style={{ fontSize: 13, color: "#1e293b", fontWeight: 600, marginTop: 2 }}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function LinkPill({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href} target="_blank" rel="noreferrer"
+      style={{
+        display: "flex", alignItems: "center", gap: 6,
+        padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+        background: "#fff", border: "1px solid #e2e8f0", color: "#3b82f6",
+        textDecoration: "none", transition: "all 0.15s",
+      }}
+    >
+      <Globe size={13} /> {label}
+    </a>
+  );
+}
+
+function TimelineCard({
+  title, subtitle, period, description, color,
+}: {
+  title: string; subtitle?: string; period?: string; description?: string; color: string;
+}) {
+  return (
+    <div style={{
+      background: "#fff", border: "1px solid #f1f5f9", borderRadius: 12,
+      padding: "12px 16px", borderLeft: `3px solid ${color}`,
+      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+    }}>
+      <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{subtitle}</div>}
+      {period && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>{period}</div>}
+      {description && (
+        <div style={{ fontSize: 12, color: "#475569", marginTop: 6, lineHeight: 1.6 }}>{description}</div>
+      )}
     </div>
   );
 }
@@ -354,19 +434,15 @@ function RejectModal({ app, onClose, onRejected }: { app: AppRow; onClose: () =>
 
   return (
     <div
-      className="conv-overlay"
-      style={{ zIndex: 1050 }}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)",
+        zIndex: 1050, display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         className="conv-popup"
-        style={{
-          maxWidth: 480,
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-        }}
+        style={{ maxWidth: 480, width: "100%", position: "relative" }}
       >
         <div className="conv-head">
           <div className="conv-head-icon" style={{ background: "#fee2e2", color: "#dc2626" }}>
@@ -401,9 +477,7 @@ function RejectModal({ app, onClose, onRejected }: { app: AppRow; onClose: () =>
               }}>
                 <AlertTriangle size={16} style={{ color: "#ea580c", flexShrink: 0, marginTop: 2 }} />
                 <p style={{ margin: 0, fontSize: 13, color: "#7c2d12", lineHeight: 1.5 }}>
-                  Rejecting will notify both the student and the company.
-                  The application status will revert to <strong>pending</strong>.
-                  Please provide a clear reason.
+                  Rejecting will notify both the student and the company. Please provide a clear reason.
                 </p>
               </div>
 
@@ -470,19 +544,15 @@ function ValidateModal({ app, onClose, onValidated }: { app: AppRow; onClose: ()
 
   return (
     <div
-      className="conv-overlay"
-      style={{ zIndex: 1050 }}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)",
+        zIndex: 1050, display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         className="conv-popup"
-        style={{
-          maxWidth: 440,
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-        }}
+        style={{ maxWidth: 440, width: "100%", position: "relative" }}
       >
         <div className="conv-head">
           <div className="conv-head-icon" style={{ background: "#dcfce7", color: "#16a34a" }}>
@@ -560,8 +630,7 @@ function ValidateModal({ app, onClose, onValidated }: { app: AppRow; onClose: ()
 const statusBadgeClass = (s: string) => {
   if (s === "accepted")  return "as-accepted";
   if (s === "validated") return "as-validated";
-  if (s === "refused")   return "as-refused";
-  if (s === "rejected")  return "as-rejected";
+  if (s === "refused" || s === "rejected") return "as-refused";
   return "as-pending";
 };
 
@@ -577,7 +646,7 @@ function ScoreBar({ score }: { score: number }) {
   const color = score >= 70 ? "#22c55e" : score >= 40 ? "#f59e0b" : "#ef4444";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <div style={{ width: 48, height: 5, background: "#e2e8f0", borderRadius: 3, overflow: "hidden" }}>
+      <div style={{ width: 52, height: 6, background: "#e2e8f0", borderRadius: 3, overflow: "hidden" }}>
         <div style={{ width: `${score}%`, height: "100%", background: color, borderRadius: 3 }} />
       </div>
       <span style={{ fontSize: 11, fontWeight: 700, color }}>{score}%</span>
@@ -674,7 +743,10 @@ const ADMApplicationsPage: React.FC = () => {
           </div>
 
           {loading ? (
-            <p style={{ padding: "28px 20px", color: "var(--sc-muted)", fontSize: 13 }}>Loading…</p>
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
+              <div className="mi-spinner" style={{ margin: "0 auto 14px" }} />
+              <p style={{ margin: 0, fontSize: 13 }}>Loading applications…</p>
+            </div>
           ) : (
             <div className="adm-table-wrap">
               <table className="adm-table">
@@ -686,7 +758,7 @@ const ADMApplicationsPage: React.FC = () => {
                     <th>CV Score</th>
                     <th>Status</th>
                     <th>Date</th>
-                    <th style={{ minWidth: 220 }}>Actions</th>
+                    <th style={{ minWidth: 240 }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -718,15 +790,15 @@ const ADMApplicationsPage: React.FC = () => {
                         {a.application_date ? String(a.application_date).slice(0, 10) : "—"}
                       </td>
                       <td>
-                        <div className="adm-actions" style={{ flexWrap: "wrap" }}>
+                        <div className="adm-actions" style={{ flexWrap: "wrap", gap: 6 }}>
                           {/* View CV — always available */}
                           <button
                             type="button"
                             className="adm-action-btn sm"
-                            style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" }}
+                            style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", gap: 5 }}
                             onClick={() => setCVTarget(a)}
                           >
-                            <User size={13} /> CV
+                            <User size={13} /> Voir CV
                           </button>
 
                           {/* Validate & Reject — only when accepted */}
@@ -737,14 +809,14 @@ const ADMApplicationsPage: React.FC = () => {
                                 className="adm-action-btn approve sm"
                                 onClick={() => setValidateTarget(a)}
                               >
-                                <CheckCircle size={13} /> Validate
+                                <CheckCircle size={13} /> Valider
                               </button>
                               <button
                                 type="button"
                                 className="adm-action-btn reject sm"
                                 onClick={() => setRejectTarget(a)}
                               >
-                                <XCircle size={13} /> Reject
+                                <XCircle size={13} /> Refuser
                               </button>
                             </>
                           )}
@@ -756,9 +828,10 @@ const ADMApplicationsPage: React.FC = () => {
               </table>
 
               {rows.length === 0 && (
-                <p className="text-muted" style={{ padding: "32px 20px", textAlign: "center" }}>
-                  No applications in your scope.
-                </p>
+                <div style={{ padding: "48px 20px", textAlign: "center", color: "#94a3b8" }}>
+                  <FileText size={40} style={{ margin: "0 auto 12px", display: "block", opacity: 0.3 }} />
+                  <p style={{ margin: 0, fontWeight: 500 }}>No applications in your scope.</p>
+                </div>
               )}
             </div>
           )}
