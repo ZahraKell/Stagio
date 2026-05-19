@@ -37,9 +37,6 @@ interface ConventionRow {
   admin_validated: boolean;
   offer_title?: string;
   company_name?: string;
-  report_submitted?: boolean;
-  report_validated?: boolean;
-  attestation_issued?: boolean;
 }
 
 type ApiRow = {
@@ -100,30 +97,24 @@ function mapRow(row: ApiRow): Application {
 
 /* ══════════════════════════════════════════════════════════
    WORKFLOW HELPERS
-   Convention status drives the button state.
    ══════════════════════════════════════════════════════════ */
-
-// Step 3 — student needs to sign
 function needsStudentSign(app: Application, conv?: ConventionRow) {
   return app.status === "accepted" && !!conv && conv.status === "PENDING_STUDENT" && !conv.student_signed;
 }
-// Step 4 — waiting company
 function waitingCompany(app: Application, conv?: ConventionRow) {
   return app.status === "accepted" && !!conv && conv.status === "PENDING_COMPANY";
 }
-// Step 5 — waiting admin
 function waitingAdmin(app: Application, conv?: ConventionRow) {
   return app.status === "accepted" && !!conv && conv.status === "PENDING_ADMIN";
 }
-// Convention fully validated
 function convValidated(conv?: ConventionRow) {
   return !!conv && (conv.status === "VALIDATED" || conv.admin_validated);
 }
-// Step 6a — convention validated, no report yet
+// Step 6a — convention validated, no report yet → show upload button on card
 function canUploadReport(app: Application, conv?: ConventionRow) {
   return convValidated(conv) && !app.report_submitted_at && !app.attestation_issued && app.stage_state !== "completed";
 }
-// Step 6b — report uploaded, waiting validation
+// Step 6b — report uploaded, waiting company validation
 function reportPending(app: Application, conv?: ConventionRow) {
   return convValidated(conv) && !!app.report_submitted_at && !app.report_validated_at && !app.attestation_issued;
 }
@@ -131,7 +122,7 @@ function reportPending(app: Application, conv?: ConventionRow) {
 function reportValidatedWaiting(app: Application, conv?: ConventionRow) {
   return convValidated(conv) && !!app.report_validated_at && !app.attestation_issued && app.stage_state !== "completed";
 }
-// Step 7 — done
+// Step 7 — fully done
 function isCompleted(app: Application) {
   return app.attestation_issued || app.stage_state === "completed";
 }
@@ -254,7 +245,7 @@ function ConventionPreviewModal({ convId, onClose }: { convId: number; onClose: 
 }
 
 /* ══════════════════════════════════════════════════════════
-   CONVENTION SIGNING POPUP (bottom sheet style)
+   CONVENTION SIGNING POPUP
    ══════════════════════════════════════════════════════════ */
 function ConventionPopup({
   convId, offerTitle, companyName, onClose, onSigned,
@@ -355,9 +346,9 @@ function ConventionPopup({
 }
 
 /* ══════════════════════════════════════════════════════════
-   REPORT UPLOAD
+   REPORT UPLOAD BUTTON — shown directly on the card row
    ══════════════════════════════════════════════════════════ */
-function ReportUpload({ appId, onRefresh }: { appId: number; onRefresh: () => void }) {
+function ReportUploadBtn({ appId, onRefresh }: { appId: number; onRefresh: () => void }) {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -385,26 +376,141 @@ function ReportUpload({ appId, onRefresh }: { appId: number; onRefresh: () => vo
     <>
       <input type="file" accept=".pdf,.doc,.docx" ref={fileRef} style={{ display: "none" }} onChange={handle} />
       <button
-        className="sc-btn-primary off-apply-full"
-        style={{ background: "#8b5cf6", display: "inline-flex", alignItems: "center", gap: 6 }}
         onClick={() => fileRef.current?.click()}
         disabled={uploading}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 5,
+          padding: "6px 13px", borderRadius: 20,
+          border: "1.5px solid #ddd6fe",
+          background: "#f5f3ff", color: "#6d28d9",
+          fontSize: 12, fontWeight: 700, cursor: uploading ? "not-allowed" : "pointer",
+          opacity: uploading ? 0.6 : 1, fontFamily: "Inter, sans-serif",
+        }}
       >
-        <Upload size={15} />
-        {uploading ? "Envoi en cours…" : "Soumettre mon rapport de stage"}
+        <Upload size={13} />
+        {uploading ? "Envoi…" : "Soumettre rapport"}
       </button>
     </>
   );
 }
 
 /* ══════════════════════════════════════════════════════════
-   INFO BADGE (waiting states)
+   INFO BADGE (waiting states inside modal)
    ══════════════════════════════════════════════════════════ */
 function InfoBadge({ icon, text, color = "var(--sc-warn)" }: { icon: React.ReactNode; text: string; color?: string }) {
   return (
     <div className="app-no-convention" style={{ color, borderColor: color }}>
       {icon}<span style={{ fontSize: 13 }}>{text}</span>
     </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   OFFER DETAILS MODAL — simple view for step 3 (sign flow)
+   Shows: title, company, location, date, status only.
+   No signing CTA — signing is done via the "Signer" card button.
+   ══════════════════════════════════════════════════════════ */
+function OfferDetailsModal({ app, onClose }: { app: Application; onClose: () => void }) {
+  const cfg = statusCfg[app.status];
+  return (
+    <>
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
+        style={{
+          position: "fixed", inset: 0,
+          background: "rgba(0,0,0,0.45)",
+          backdropFilter: "blur(3px)",
+          zIndex: 999,
+        }}
+      />
+      {/* Box */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.93, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.93, y: 20 }}
+        transition={{ duration: 0.22, ease: "easeOut" }}
+        style={{
+          position: "fixed",
+          top: "50%", left: "50%",
+          transform: "translate(-50%, -50%)",
+          zIndex: 1000,
+          width: "min(540px, 94vw)",
+          background: "#fff",
+          borderRadius: 24,
+          boxShadow: "0 24px 64px rgba(0,0,0,0.22)",
+          padding: 28,
+          display: "flex", flexDirection: "column", gap: 18,
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+          <div style={{
+            width: 50, height: 50, borderRadius: 14,
+            background: "var(--sc-sidebar-grad, #b8893e)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "Epilogue, sans-serif", fontSize: 14, fontWeight: 800,
+            color: "#fff", flexShrink: 0,
+          }}>
+            {app.logo}
+          </div>
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontFamily: "Epilogue, sans-serif", fontSize: 18, fontWeight: 800, margin: 0, color: "#0f172a" }}>
+              {app.title}
+            </h2>
+            <span style={{ fontSize: 13, color: "#64748b" }}>{app.company} · {app.wilaya}</span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: 34, height: 34, borderRadius: 10, border: "1px solid #e2e8f0",
+              background: "#f8fafc", cursor: "pointer", display: "flex",
+              alignItems: "center", justifyContent: "center", color: "#64748b", flexShrink: 0,
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Badges */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingBottom: 14, borderBottom: "1px solid #f1f5f9" }}>
+          <span className={`sc-badge ${cfg.badgeClass}`}>{cfg.icon} {cfg.label}</span>
+          <span className="off-mpill"><Calendar size={11} /> Postulé le {app.appliedDate}</span>
+        </div>
+
+        {/* Details grid */}
+        <div className="off-modal-details">
+          <div className="off-mdetail"><span>Entreprise</span><strong>{app.company}</strong></div>
+          <div className="off-mdetail"><span>Localisation</span><strong>{app.wilaya}</strong></div>
+          <div className="off-mdetail"><span>Date de candidature</span><strong>{app.appliedDate}</strong></div>
+          <div className="off-mdetail"><span>Statut</span><strong>{cfg.label}</strong></div>
+        </div>
+
+        {/* Info about what to do */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "10px 14px", borderRadius: 12,
+          background: "#eff6ff", border: "1px solid #bfdbfe",
+          fontSize: 13, color: "#1d4ed8",
+        }}>
+          <PenLine size={15} style={{ flexShrink: 0 }} />
+          <span>Utilisez le bouton <strong>Signer</strong> sur la carte pour signer votre convention de stage.</span>
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%", padding: "10px 0", borderRadius: 12,
+            border: "1.5px solid #e2e8f0", background: "none",
+            color: "#1e293b", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", fontFamily: "Inter, sans-serif",
+          }}
+        >
+          Fermer
+        </button>
+      </motion.div>
+    </>
   );
 }
 
@@ -416,8 +522,15 @@ const ApplicationsPage: React.FC = () => {
   const [conventions, setConventions] = useState<ConventionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<AppStatus | "all">("all");
+
+  // Full workflow modal (timeline + CTA) — used for steps 4,5,6,7
   const [modal, setModal] = useState<Application | null>(null);
-  const [signTarget, setSignTarget] = useState<{ appId: number; convId: number; offerTitle: string; companyName: string } | null>(null);
+  // Simple offer details modal — used for step 3 (sign flow) "Voir" button
+  const [detailsModal, setDetailsModal] = useState<Application | null>(null);
+
+  const [signTarget, setSignTarget] = useState<{
+    appId: number; convId: number; offerTitle: string; companyName: string;
+  } | null>(null);
   const [previewConvId, setPreviewConvId] = useState<number | null>(null);
 
   /* ── Load ── */
@@ -486,31 +599,64 @@ const ApplicationsPage: React.FC = () => {
   const modalConv = modal ? conventions.find(c => c.application_id === modal.id) : undefined;
 
   /* ════════════════════════════════════════════════════════
-     CARD BUTTONS — shown inline on each row
-     ════════════════════════════════════════════════════════ */
+     CARD BUTTONS
+     ════════════════════════════════════════════════════════
+
+     STEP 3 (sign_convention):
+       [Signer]  [Voir →]   ← "Voir" opens simple offer details (no sign CTA)
+
+     STEP 4 (waiting_company):
+       [Voir →]
+
+     STEP 5 (waiting_admin):
+       [Voir →]
+
+     STEP 6a (canUploadReport):
+       [👁 Convention]  [↓]  [↑ Soumettre rapport]
+       ← "Voir" is REMOVED; upload is the main action on the card
+
+     STEP 6b (reportPending):
+       [↓ Convention]  [Voir →]
+
+     STEP 6c (reportValidatedWaiting):
+       [↓ Convention]  [Voir →]
+
+     STEP 7 (completed):
+       [🏅 Attestation]  [↓ Convention]  [Voir →]
+
+     DEFAULT (pending / review / rejected / no conv):
+       [Voir →]
+  */
   function cardButtons(app: Application) {
     const conv = conventions.find(c => c.application_id === app.id);
 
-    // Step 3 — needs student signature
+    /* ── STEP 3 — needs student signature ── */
     if (needsStudentSign(app, conv)) return (
       <>
         <button
           className="sc-btn-download"
           style={{ background: "#eff6ff", color: "#2563eb", borderColor: "#bfdbfe", fontWeight: 700 }}
-          onClick={() => setSignTarget({ appId: app.id, convId: conv!.id, offerTitle: app.title, companyName: app.company })}
+          onClick={() => setSignTarget({
+            appId: app.id, convId: conv!.id, offerTitle: app.title, companyName: app.company,
+          })}
         >
           <PenLine size={13} /> Signer
         </button>
-        <button className="app-view-btn" onClick={() => setModal(app)}><Eye size={13} /> Voir <ChevronRight size={12} /></button>
+        {/* "Voir" opens simple offer details — NOT the workflow modal */}
+        <button className="app-view-btn" onClick={() => setDetailsModal(app)}>
+          <Eye size={13} /> Voir <ChevronRight size={12} />
+        </button>
       </>
     );
 
-    // Steps 4 & 5 — waiting others
+    /* ── STEPS 4 & 5 — waiting others ── */
     if (waitingCompany(app, conv) || waitingAdmin(app, conv)) return (
-      <button className="app-view-btn" onClick={() => setModal(app)}><Eye size={13} /> Voir <ChevronRight size={12} /></button>
+      <button className="app-view-btn" onClick={() => setModal(app)}>
+        <Eye size={13} /> Voir <ChevronRight size={12} />
+      </button>
     );
 
-    // Step 7 — completed
+    /* ── STEP 7 — completed ── */
     if (isCompleted(app) && convValidated(conv)) return (
       <>
         <button
@@ -523,31 +669,37 @@ const ApplicationsPage: React.FC = () => {
         <button className="sc-btn-download" onClick={() => downloadConvention(conv!.id)}>
           <Download size={13} /> Convention
         </button>
-        <button className="app-view-btn" onClick={() => setModal(app)}><Eye size={13} /> Voir <ChevronRight size={12} /></button>
+        <button className="app-view-btn" onClick={() => setModal(app)}>
+          <Eye size={13} /> Voir <ChevronRight size={12} />
+        </button>
       </>
     );
 
-    // Step 6c — report validated, waiting attestation
+    /* ── STEP 6c — report validated, waiting attestation ── */
     if (reportValidatedWaiting(app, conv)) return (
       <>
         <button className="sc-btn-download" onClick={() => downloadConvention(conv!.id)}>
           <Download size={13} /> Convention
         </button>
-        <button className="app-view-btn" onClick={() => setModal(app)}><Eye size={13} /> Voir <ChevronRight size={12} /></button>
+        <button className="app-view-btn" onClick={() => setModal(app)}>
+          <Eye size={13} /> Voir <ChevronRight size={12} />
+        </button>
       </>
     );
 
-    // Step 6b — report submitted, pending validation
+    /* ── STEP 6b — report submitted, pending validation ── */
     if (reportPending(app, conv)) return (
       <>
         <button className="sc-btn-download" onClick={() => downloadConvention(conv!.id)}>
           <Download size={13} /> Convention
         </button>
-        <button className="app-view-btn" onClick={() => setModal(app)}><Eye size={13} /> Voir <ChevronRight size={12} /></button>
+        <button className="app-view-btn" onClick={() => setModal(app)}>
+          <Eye size={13} /> Voir <ChevronRight size={12} />
+        </button>
       </>
     );
 
-    // Step 6a — convention validated, can upload report
+    /* ── STEP 6a — convention validated, upload report (NO "Voir" button) ── */
     if (canUploadReport(app, conv)) return (
       <>
         <button
@@ -560,43 +712,34 @@ const ApplicationsPage: React.FC = () => {
         <button className="sc-btn-download" onClick={() => downloadConvention(conv!.id)}>
           <Download size={13} />
         </button>
-        <button className="app-view-btn" onClick={() => setModal(app)}><Eye size={13} /> Voir <ChevronRight size={12} /></button>
+        {/* Upload replaces "Voir" as the primary action */}
+        <ReportUploadBtn appId={app.id} onRefresh={() => void loadAll()} />
       </>
     );
 
-    // Default — pending / review / rejected
+    /* ── DEFAULT — pending / review / rejected / no convention yet ── */
     return (
-      <button className="app-view-btn" onClick={() => setModal(app)}><Eye size={13} /> Voir <ChevronRight size={12} /></button>
+      <button className="app-view-btn" onClick={() => setModal(app)}>
+        <Eye size={13} /> Voir <ChevronRight size={12} />
+      </button>
     );
   }
 
   /* ════════════════════════════════════════════════════════
-     MODAL CTA — buttons inside the detail popup
-     ════════════════════════════════════════════════════════ */
+     MODAL CTA — buttons inside the full workflow detail popup
+     (not shown for step 3 — that uses OfferDetailsModal instead)
+  ════════════════════════════════════════════════════════ */
   function modalCTA(app: Application, conv: ConventionRow | undefined) {
 
-    // Step 3 — sign
-    if (needsStudentSign(app, conv)) return (
-      <button
-        className="sc-btn-primary off-apply-full"
-        style={{ background: "#2563eb", display: "inline-flex", alignItems: "center", gap: 6 }}
-        onClick={() => { setSignTarget({ appId: app.id, convId: conv!.id, offerTitle: app.title, companyName: app.company }); setModal(null); }}
-      >
-        <PenLine size={15} /> Signer la convention
-      </button>
-    );
-
-    // Step 4
+    /* Steps 4 & 5 — waiting others */
     if (waitingCompany(app, conv)) return (
       <InfoBadge icon={<Clock size={15} />} text="En attente de la signature de l'entreprise…" />
     );
-
-    // Step 5
     if (waitingAdmin(app, conv)) return (
       <InfoBadge icon={<Clock size={15} />} text="En attente de validation par l'administration…" color="var(--sc-purple)" />
     );
 
-    // Step 7 — completed
+    /* Step 7 — completed */
     if (isCompleted(app) && convValidated(conv)) return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
         <button
@@ -625,10 +768,10 @@ const ApplicationsPage: React.FC = () => {
       </div>
     );
 
-    // Step 6c — report validated, waiting attestation
+    /* Step 6c — report validated, waiting attestation */
     if (reportValidatedWaiting(app, conv)) return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
-        <InfoBadge icon={<ScrollText size={15} />} text="Rapport validé — en attente de l'attestation de l'administration" color="#8b5cf6" />
+        <InfoBadge icon={<ScrollText size={15} />} text="Rapport validé — en attente de l'attestation" color="#8b5cf6" />
         <div style={{ display: "flex", gap: 8 }}>
           <button
             className="sc-btn-primary off-apply-full"
@@ -648,7 +791,7 @@ const ApplicationsPage: React.FC = () => {
       </div>
     );
 
-    // Step 6b — report submitted, waiting company
+    /* Step 6b — report submitted, waiting company */
     if (reportPending(app, conv)) return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
         <InfoBadge icon={<ScrollText size={15} />} text="Rapport soumis — en attente de validation par l'entreprise" color="#d97706" />
@@ -671,7 +814,8 @@ const ApplicationsPage: React.FC = () => {
       </div>
     );
 
-    // Step 6a — convention validated, upload report
+    /* Step 6a — convention validated, upload report
+       (upload button is on the card row, but keep it here too for completeness) */
     if (canUploadReport(app, conv)) return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
         <div style={{ display: "flex", gap: 8 }}>
@@ -690,11 +834,10 @@ const ApplicationsPage: React.FC = () => {
             <Download size={15} /> Télécharger
           </button>
         </div>
-        <ReportUpload appId={app.id} onRefresh={() => { setModal(null); void loadAll(); }} />
       </div>
     );
 
-    // No convention yet / not actionable
+    /* Not actionable */
     return (
       <div className="app-no-convention">
         <FileText size={15} />
@@ -806,12 +949,12 @@ const ApplicationsPage: React.FC = () => {
       )}
 
       {/* ════════════════════════════════════════════════════════
-          DETAIL MODAL — perfectly centred on screen
-          ════════════════════════════════════════════════════════ */}
+          FULL WORKFLOW MODAL — steps 4, 5, 6, 7
+          (centered, not bottom sheet)
+      ════════════════════════════════════════════════════════ */}
       <AnimatePresence>
         {modal && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setModal(null)}
@@ -822,8 +965,6 @@ const ApplicationsPage: React.FC = () => {
                 zIndex: 999,
               }}
             />
-
-            {/* Modal box — centred with transform */}
             <motion.div
               initial={{ opacity: 0, scale: 0.93, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -831,8 +972,7 @@ const ApplicationsPage: React.FC = () => {
               transition={{ duration: 0.22, ease: "easeOut" }}
               style={{
                 position: "fixed",
-                top: "50%",
-                left: "50%",
+                top: "50%", left: "50%",
                 transform: "translate(-50%, -50%)",
                 zIndex: 1000,
                 width: "min(640px, 94vw)",
@@ -842,9 +982,7 @@ const ApplicationsPage: React.FC = () => {
                 borderRadius: 24,
                 boxShadow: "0 24px 64px rgba(0,0,0,0.22)",
                 padding: 28,
-                display: "flex",
-                flexDirection: "column",
-                gap: 20,
+                display: "flex", flexDirection: "column", gap: 20,
               }}
             >
               {/* Header */}
@@ -904,10 +1042,16 @@ const ApplicationsPage: React.FC = () => {
                     </div>
                   )}
                   {modal.report_submitted_at && (
-                    <div className="off-mdetail"><span>Rapport soumis le</span><strong>{formatDate(modal.report_submitted_at)}</strong></div>
+                    <div className="off-mdetail">
+                      <span>Rapport soumis le</span>
+                      <strong>{formatDate(modal.report_submitted_at)}</strong>
+                    </div>
                   )}
                   {modal.report_validated_at && (
-                    <div className="off-mdetail"><span>Rapport validé le</span><strong>{formatDate(modal.report_validated_at)}</strong></div>
+                    <div className="off-mdetail">
+                      <span>Rapport validé le</span>
+                      <strong>{formatDate(modal.report_validated_at)}</strong>
+                    </div>
                   )}
                 </div>
               </div>
@@ -922,6 +1066,15 @@ const ApplicationsPage: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* ════════════════════════════════════════════════════════
+          OFFER DETAILS MODAL — step 3 "Voir" button (no sign CTA)
+      ════════════════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {detailsModal && (
+          <OfferDetailsModal app={detailsModal} onClose={() => setDetailsModal(null)} />
+        )}
+      </AnimatePresence>
+
       {/* CONVENTION SIGNING POPUP */}
       {signTarget && (
         <ConventionPopup
@@ -933,10 +1086,11 @@ const ApplicationsPage: React.FC = () => {
         />
       )}
 
-      {/* CONVENTION PREVIEW */}
+      {/* CONVENTION PDF PREVIEW */}
       {previewConvId !== null && (
         <ConventionPreviewModal convId={previewConvId} onClose={() => setPreviewConvId(null)} />
       )}
+
     </DashboardLayout>
   );
 };
