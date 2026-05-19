@@ -530,15 +530,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           </main>
         </div>
 
-        {/* FOOTER */}
-        <footer className="sc-footer">
-          <span>© 2026 StageConnect · UFMC1</span>
-          <div className="sc-footer-links">
-            <Link to={privacyPath}>Privacy</Link>
-            <Link to={helpPath}>Help Center</Link>
-            <Link to={settingsPath}>Settings</Link>
-          </div>
-        </footer>
+        
+        
       </div>
     </div>
   );
