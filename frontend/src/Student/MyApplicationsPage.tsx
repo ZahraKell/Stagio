@@ -110,7 +110,7 @@ function waitingAdmin(app: Application, conv?: ConventionRow) {
 function convValidated(conv?: ConventionRow) {
   return !!conv && (conv.status === "VALIDATED" || conv.admin_validated);
 }
-// Step 6a — convention validated, no report yet → show upload button on card (replaces "Voir")
+// Step 6a — convention validated, no report yet → show upload button on card
 function canUploadReport(app: Application, conv?: ConventionRow) {
   return convValidated(conv) && !app.report_submitted_at && !app.attestation_issued && app.stage_state !== "completed";
 }
@@ -523,7 +523,7 @@ const ApplicationsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<AppStatus | "all">("all");
 
-  // Full workflow modal (timeline + CTA) — used for steps 4, 5, 6b, 6c, 7
+  // Full workflow modal (timeline + CTA) — used for steps 4,5,6,7
   const [modal, setModal] = useState<Application | null>(null);
   // Simple offer details modal — used for step 3 (sign flow) "Voir" button
   const [detailsModal, setDetailsModal] = useState<Application | null>(null);
@@ -602,33 +602,30 @@ const ApplicationsPage: React.FC = () => {
      CARD BUTTONS
      ════════════════════════════════════════════════════════
 
-     STEP 3 (needsStudentSign):
-       [✍️ Signer]  [👁 Voir →]
-       "Voir" opens simple OfferDetailsModal (offer info only, no sign CTA)
+     STEP 3 (sign_convention):
+       [Signer]  [Voir →]   ← "Voir" opens simple offer details (no sign CTA)
 
-     STEP 4 (waitingCompany):
-       [👁 Voir →]   ← opens full workflow modal with waiting badge
+     STEP 4 (waiting_company):
+       [Voir →]
 
-     STEP 5 (waitingAdmin):
-       [👁 Voir →]   ← opens full workflow modal with waiting badge
+     STEP 5 (waiting_admin):
+       [Voir →]
 
      STEP 6a (canUploadReport):
-       [👁 Convention]  [⬇]  [⬆ Soumettre rapport]
-       NO "Voir" button — upload IS the primary action
+       [👁 Convention]  [↓]  [↑ Soumettre rapport]
+       ← "Voir" is REMOVED; upload is the main action on the card
 
      STEP 6b (reportPending):
-       [⬇ Convention]
-       NO "Voir" button — waiting state, nothing to act on
+       [↓ Convention]  [Voir →]
 
      STEP 6c (reportValidatedWaiting):
-       [⬇ Convention]
-       NO "Voir" button — waiting state, nothing to act on
+       [↓ Convention]  [Voir →]
 
      STEP 7 (completed):
-       [🏅 Attestation]  [⬇ Convention]  [👁 Voir →]
+       [🏅 Attestation]  [↓ Convention]  [Voir →]
 
      DEFAULT (pending / review / rejected / no conv):
-       [👁 Voir →]
+       [Voir →]
   */
   function cardButtons(app: Application) {
     const conv = conventions.find(c => c.application_id === app.id);
@@ -678,21 +675,31 @@ const ApplicationsPage: React.FC = () => {
       </>
     );
 
-    /* ── STEP 6c — report validated, waiting attestation — NO "Voir" button ── */
+    /* ── STEP 6c — report validated, waiting attestation ── */
     if (reportValidatedWaiting(app, conv)) return (
-      <button className="sc-btn-download" onClick={() => downloadConvention(conv!.id)}>
-        <Download size={13} /> Convention
-      </button>
+      <>
+        <button className="sc-btn-download" onClick={() => downloadConvention(conv!.id)}>
+          <Download size={13} /> Convention
+        </button>
+        <button className="app-view-btn" onClick={() => setModal(app)}>
+          <Eye size={13} /> Voir <ChevronRight size={12} />
+        </button>
+      </>
     );
 
-    /* ── STEP 6b — report submitted, pending validation — NO "Voir" button ── */
+    /* ── STEP 6b — report submitted, pending validation ── */
     if (reportPending(app, conv)) return (
-      <button className="sc-btn-download" onClick={() => downloadConvention(conv!.id)}>
-        <Download size={13} /> Convention
-      </button>
+      <>
+        <button className="sc-btn-download" onClick={() => downloadConvention(conv!.id)}>
+          <Download size={13} /> Convention
+        </button>
+        <button className="app-view-btn" onClick={() => setModal(app)}>
+          <Eye size={13} /> Voir <ChevronRight size={12} />
+        </button>
+      </>
     );
 
-    /* ── STEP 6a — convention validated, upload report — NO "Voir" button ── */
+    /* ── STEP 6a — convention validated, upload report (NO "Voir" button) ── */
     if (canUploadReport(app, conv)) return (
       <>
         <button
@@ -720,8 +727,7 @@ const ApplicationsPage: React.FC = () => {
 
   /* ════════════════════════════════════════════════════════
      MODAL CTA — buttons inside the full workflow detail popup
-     Note: step 3 uses OfferDetailsModal instead (no sign CTA there).
-           step 6a has no modal (no "Voir" on card), but kept for safety.
+     (not shown for step 3 — that uses OfferDetailsModal instead)
   ════════════════════════════════════════════════════════ */
   function modalCTA(app: Application, conv: ConventionRow | undefined) {
 
@@ -785,7 +791,7 @@ const ApplicationsPage: React.FC = () => {
       </div>
     );
 
-    /* Step 6b — report submitted, waiting company validation */
+    /* Step 6b — report submitted, waiting company */
     if (reportPending(app, conv)) return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
         <InfoBadge icon={<ScrollText size={15} />} text="Rapport soumis — en attente de validation par l'entreprise" color="#d97706" />
@@ -809,24 +815,25 @@ const ApplicationsPage: React.FC = () => {
     );
 
     /* Step 6a — convention validated, upload report
-       (This modal is not reachable via card buttons since there's no "Voir" for 6a,
-        but kept here as a safety fallback — shows convention actions only, NO upload) */
+       (upload button is on the card row, but keep it here too for completeness) */
     if (canUploadReport(app, conv)) return (
-      <div style={{ display: "flex", gap: 8, width: "100%" }}>
-        <button
-          className="sc-btn-primary off-apply-full"
-          style={{ background: "#3b82f6", display: "inline-flex", alignItems: "center", gap: 6 }}
-          onClick={() => setPreviewConvId(conv!.id)}
-        >
-          <Eye size={15} /> Voir la convention
-        </button>
-        <button
-          className="sc-btn-primary off-apply-full"
-          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          onClick={() => downloadConvention(conv!.id)}
-        >
-          <Download size={15} /> Télécharger
-        </button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            className="sc-btn-primary off-apply-full"
+            style={{ background: "#3b82f6", display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={() => setPreviewConvId(conv!.id)}
+          >
+            <Eye size={15} /> Voir la convention
+          </button>
+          <button
+            className="sc-btn-primary off-apply-full"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={() => downloadConvention(conv!.id)}
+          >
+            <Download size={15} /> Télécharger
+          </button>
+        </div>
       </div>
     );
 
@@ -942,9 +949,8 @@ const ApplicationsPage: React.FC = () => {
       )}
 
       {/* ════════════════════════════════════════════════════════
-          FULL WORKFLOW MODAL — steps 4, 5, 6b, 6c, 7
-          (NOT used for step 3 — that uses OfferDetailsModal)
-          (NOT used for step 6a — no "Voir" button on card for that state)
+          FULL WORKFLOW MODAL — steps 4, 5, 6, 7
+          (centered, not bottom sheet)
       ════════════════════════════════════════════════════════ */}
       <AnimatePresence>
         {modal && (
