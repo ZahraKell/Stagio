@@ -221,7 +221,7 @@ export default function CompanyLayout({ children }: { children: React.ReactNode 
               localStorage.removeItem("user_data");
               localStorage.removeItem("full_name");
               localStorage.removeItem("company_name");
-              navigate("/login");
+              navigate("/");
             });
           }}
         >

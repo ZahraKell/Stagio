@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 interface Company {
   userId: number;
   companyPk: number | null;
+  company_rc: string;
   id: number;
   company_name: string;
   company_sector: string;
@@ -81,11 +82,19 @@ export default function AdminCompanies() {
             userId: uid,
             companyPk: pend ? pend.id : null,
             id: uid,
-            company_name: (u.full_name as string) || (u.username as string),
-            company_sector: (pend?.company_sector as string) || "—",
-            company_website: "—",
-            town: (pend?.town as string) || (u.town as string) || "—",
-            description: "",
+            // ← now reads directly from backend fields
+            company_name:
+              (u.company_name as string) ||
+              (u.full_name as string) ||
+              (u.username as string),
+            company_sector:
+              (u.company_sector as string) ||
+              (pend?.company_sector as string) ||
+              "—",
+            company_website: (u.company_website as string) || "—",
+            town: (u.town as string) || (pend?.town as string) || "—",
+            description: (u.description as string) || "",
+            company_rc: (u.company_rc as string) || "—",
             logo: null,
             status: !active
               ? "suspended"
@@ -97,7 +106,10 @@ export default function AdminCompanies() {
             offers_count: Number((u.offers_count as number) ?? 0),
             conventions_count: Number((u.conventions_count as number) ?? 0),
             rating: 0,
-            submitted_date: pend?.submitted_at?.split("T")[0] || "—",
+            submitted_date:
+              (u.submitted_date as string) ||
+              pend?.submitted_at?.split("T")[0] ||
+              "—",
             is_approved: active && !isPending,
             is_rejected: false,
           };
@@ -527,6 +539,10 @@ export default function AdminCompanies() {
                     <div className="am-detail-item">
                       <span>Website</span>
                       <strong>{selectedCompany.company_website}</strong>
+                    </div>
+                    <div className="am-detail-item">
+                      <span>RC Number</span>
+                      <strong>{selectedCompany.company_rc}</strong>
                     </div>
                     <div className="am-detail-item">
                       <span>Location</span>

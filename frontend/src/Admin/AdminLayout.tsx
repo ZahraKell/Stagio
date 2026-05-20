@@ -21,7 +21,10 @@ export default function AdminLayout() {
   const fetchNotifCount = async () => {
     try {
       const { data } = await api.get("notifications/unread-count/");
-      const body = data as { error?: boolean; data?: { unread_count?: number } };
+      const body = data as {
+        error?: boolean;
+        data?: { unread_count?: number };
+      };
       if (!body.error) setNotifCount(body.data?.unread_count ?? 0);
     } catch {
       setNotifCount(0);
@@ -30,12 +33,21 @@ export default function AdminLayout() {
 
   const fetchNotifications = async () => {
     try {
-      const { data } = await api.get("notifications/", { params: { is_read: "false" } });
+      const { data } = await api.get("notifications/", {
+        params: { is_read: "false" },
+      });
       const body = data as {
         error?: boolean;
-        data?: { notifications?: Array<{ id: number; message: string; created_at: string }> };
+        data?: {
+          notifications?: Array<{
+            id: number;
+            message: string;
+            created_at: string;
+          }>;
+        };
       };
-      if (!body.error) setNotifications(body.data?.notifications?.slice(0, 5) || []);
+      if (!body.error)
+        setNotifications(body.data?.notifications?.slice(0, 5) || []);
     } catch {
       setNotifications([]);
     }
@@ -51,14 +63,16 @@ export default function AdminLayout() {
       await api.patch("notifications/read-all/");
       setNotifCount(0);
       setNotifications([]);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   const handleLogout = async () => {
     await authLogout();
     localStorage.removeItem("user_data");
     localStorage.removeItem("full_name");
-    navigate("/login");
+    navigate("/");
   };
 
   const menuItems = [
@@ -77,7 +91,8 @@ export default function AdminLayout() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const currentPage = menuItems.find(m => m.path === location.pathname)?.label || "Dashboard";
+  const currentPage =
+    menuItems.find((m) => m.path === location.pathname)?.label || "Dashboard";
 
   return (
     <div className="am-layout">
@@ -96,7 +111,10 @@ export default function AdminLayout() {
             <a
               key={item.path}
               href={item.path}
-              onClick={(e) => { e.preventDefault(); navigate(item.path); }}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(item.path);
+              }}
               className={`am-nav-item ${isActive(item.path) ? "am-nav-active" : ""}`}
             >
               <span className="am-nav-icon">{item.icon}</span>
@@ -125,18 +143,29 @@ export default function AdminLayout() {
             <div className="am-notif-wrap">
               <button className="am-bell-btn" onClick={handleBellClick}>
                 🔔
-                {notifCount > 0 && <span className="am-badge">{notifCount}</span>}
+                {notifCount > 0 && (
+                  <span className="am-badge">{notifCount}</span>
+                )}
               </button>
 
               {showNotif && (
                 <div className="am-notif-panel">
                   <div className="am-notif-head">
                     <span>Notifications ({notifCount} unread)</span>
-                    <button className="am-mark-all" onClick={markAllRead}>Mark all read</button>
+                    <button className="am-mark-all" onClick={markAllRead}>
+                      Mark all read
+                    </button>
                   </div>
                   <div className="am-notif-list">
                     {notifications.length === 0 ? (
-                      <div style={{ padding: "1rem", textAlign: "center", color: "#94a3b8", fontSize: ".8rem" }}>
+                      <div
+                        style={{
+                          padding: "1rem",
+                          textAlign: "center",
+                          color: "#94a3b8",
+                          fontSize: ".8rem",
+                        }}
+                      >
                         All caught up! 🎉
                       </div>
                     ) : (
@@ -151,11 +180,25 @@ export default function AdminLayout() {
                       ))
                     )}
                   </div>
-                  <div style={{ padding: ".5rem 1rem", borderTop: "1px solid #f1f5f9" }}>
+                  <div
+                    style={{
+                      padding: ".5rem 1rem",
+                      borderTop: "1px solid #f1f5f9",
+                    }}
+                  >
                     <a
                       href="/admin/notifications"
-                      onClick={(e) => { e.preventDefault(); navigate("/admin/notifications"); setShowNotif(false); }}
-                      style={{ fontSize: ".75rem", color: "#3b82f6", textDecoration: "none", fontWeight: 600 }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate("/admin/notifications");
+                        setShowNotif(false);
+                      }}
+                      style={{
+                        fontSize: ".75rem",
+                        color: "#3b82f6",
+                        textDecoration: "none",
+                        fontWeight: 600,
+                      }}
                     >
                       View all notifications →
                     </a>
@@ -169,7 +212,9 @@ export default function AdminLayout() {
               <div className="am-user-avatar">
                 {userData?.full_name?.charAt(0) || "A"}
               </div>
-              <span className="am-user-name">{userData?.full_name || "Admin"}</span>
+              <span className="am-user-name">
+                {userData?.full_name || "Admin"}
+              </span>
             </div>
           </div>
         </header>

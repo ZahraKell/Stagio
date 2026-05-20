@@ -324,7 +324,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     localStorage.removeItem("user_data");
     localStorage.removeItem("full_name");
     localStorage.removeItem("company_name");
-    navigate("/login");
+    navigate("/");
   };
 
   const markAllRead = () => {

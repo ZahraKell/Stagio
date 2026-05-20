@@ -51,9 +51,25 @@ def list_users(request):
                 row['conventions_count'] = c.internshipoffer_set.aggregate(
                     total=Count('applications__convention')
                 )['total'] or 0
+                row['company_name']    = c.company_name or ''
+                row['company_sector']  = c.company_sector or '—'
+                row['company_website'] = c.company_website or '—'
+                row['town']            = c.town or '—'
+                row['description']     = c.description or ''
+                row['company_rc']      = c.company_rc or '—'
+                row['pnum']            = u.pnum or '—'
+                row['submitted_date']  = c.submitted_at.isoformat().split('T')[0] if c.submitted_at else '—'
             except Exception:
-                row['offers_count'] = 0
+                row['offers_count']    = 0
                 row['conventions_count'] = 0
+                row['company_name']    = u.full_name or u.username
+                row['company_sector']  = '—'
+                row['company_website'] = '—'
+                row['town']            = '—'
+                row['description']     = ''
+                row['company_rc']      = '—'
+                row['pnum']            = u.pnum or '—'
+                row['submitted_date']  = '—'
         data.append(row)
     return ok(data=data, message=f"{len(data)} user(s) found.")
 
