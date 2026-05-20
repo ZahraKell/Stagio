@@ -4,7 +4,7 @@ from rest_framework.response   import Response
 from rest_framework            import status
 from django.contrib.auth       import get_user_model
 from django.utils import timezone
-from .email_utils import send_transactional_email
+from django.core.mail import send_mail
 from django.conf import settings
 from .models import AllowedInstitutionDomain
 from .models import Company
@@ -51,9 +51,25 @@ def list_users(request):
                 row['conventions_count'] = c.internshipoffer_set.aggregate(
                     total=Count('applications__convention')
                 )['total'] or 0
+                row['company_name']    = c.company_name or ''
+                row['company_sector']  = c.company_sector or '—'
+                row['company_website'] = c.company_website or '—'
+                row['town']            = c.town or '—'
+                row['description']     = c.description or ''
+                row['company_rc']      = c.company_rc or '—'
+                row['pnum']            = u.pnum or '—'
+                row['submitted_date']  = c.submitted_at.isoformat().split('T')[0] if c.submitted_at else '—'
             except Exception:
-                row['offers_count'] = 0
+                row['offers_count']    = 0
                 row['conventions_count'] = 0
+                row['company_name']    = u.full_name or u.username
+                row['company_sector']  = '—'
+                row['company_website'] = '—'
+                row['town']            = '—'
+                row['description']     = ''
+                row['company_rc']      = '—'
+                row['pnum']            = u.pnum or '—'
+                row['submitted_date']  = '—'
         data.append(row)
     return ok(data=data, message=f"{len(data)} user(s) found.")
 
@@ -297,14 +313,13 @@ def approve_company(request, pk):
     company.rejection_reason = None
     company.approved_at = timezone.now()
     company.save(update_fields=['is_approved', 'is_rejected', 'rejection_reason', 'approved_at'])
-    try:
-        send_transactional_email(
-            "[Stag.io] Company account approved",
-            "Your company profile has been approved. You can now publish internship offers.",
-            [company.user.email],
-        )
-    except Exception:
-        pass
+    send_mail(
+        "[Stag.io] Company account approved",
+        "Your company profile has been approved. You can now publish internship offers.",
+        getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        [company.user.email],
+        fail_silently=True,
+    )
     return ok(message="Company approved.")
 
 
@@ -326,12 +341,11 @@ def reject_company(request, pk):
     company.rejection_reason = reason
     company.approved_at = None
     company.save(update_fields=['is_approved', 'is_rejected', 'rejection_reason', 'approved_at'])
-    try:
-        send_transactional_email(
-            "[Stag.io] Company account rejected",
-            f"Your company profile was rejected.\nReason: {reason}",
-            [company.user.email],
-        )
-    except Exception:
-        pass
+    send_mail(
+        "[Stag.io] Company account rejected",
+        f"Your company profile was rejected.\nReason: {reason}",
+        getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        [company.user.email],
+        fail_silently=True,
+    )
     return ok(message="Company rejected.")
