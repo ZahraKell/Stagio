@@ -1,18 +1,6 @@
 // src/components/CompanyRegisterForm.tsx
 import type { AxiosError } from "axios";
 import api from "../api";
-// ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
-// This component handles the full company registration flow:
-// Step 1 — Company enters email + password → backend creates
-//           a pending account and returns status
-// Step 2 — Form appears to fill company details
-// Step 3 — Success message shown
-//
-// HOW TO USE in AuthPage.tsx:
-// When user selects role="company" and submits signup,
-// instead of going to the normal register endpoint,
-// render this component in place of the form.
-// ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -47,16 +35,10 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
   const [rejReason, setRejReason] = useState("");
   const [otpCode, setOtpCode] = useState("");
 
-  // Step 1 — credentials
-  const [creds, setCreds] = useState({
-    email: "",
-    password: "",
-    confirm: "",
-  });
+  const [creds, setCreds] = useState({ email: "", password: "", confirm: "" });
 
-  // Step 2 — company details
   const [details, setDetails] = useState({
-    full_name: "",   // contact person name
+    full_name: "",
     company_name: "",
     company_sector: "",
     company_rc: "",
@@ -65,7 +47,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     description: "",
   });
 
-  // ”€”€ Step 1 submit ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+  // ── STEP 1 — Credentials ──────────────────────────────────────────────────
   const handleCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -98,6 +80,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     }
   };
 
+  // ── STEP 2 — OTP Verification ─────────────────────────────────────────────
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -105,6 +88,9 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     try {
       await api.post("auth/verify-otp/", { email: creds.email, code: otpCode.trim() });
       await login(creds.email, creds.password);
+      // Safety wait — ensures token is stored in localStorage before the
+      // next request fires, avoiding a spurious 401 on complete-profile.
+      await new Promise(res => setTimeout(res, 300));
       setStep("details");
     } catch (err: unknown) {
       setError(formatApiError(err));
@@ -125,13 +111,18 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     }
   };
 
-  // ”€”€ Step 2 submit ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+  // ── STEP 3 — Company Details ──────────────────────────────────────────────
   const handleDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!details.full_name.trim() || !details.company_name.trim() ||
-      !details.company_rc.trim() || !details.town.trim()) {
+    if (
+      !details.full_name.trim() ||
+      !details.company_name.trim() ||
+      !details.company_rc.trim() ||
+      !details.town.trim() ||
+      !details.description.trim()
+    ) {
       setError("Veuillez remplir tous les champs obligatoires.");
       return;
     }
@@ -139,43 +130,37 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     setLoading(true);
     try {
       await api.patch("auth/company/complete-profile/", {
-        full_name: details.full_name,
-        company_name: details.company_name,
-        company_sector: details.company_sector,
-        company_rc: details.company_rc,
-        company_website: details.company_website,
-        town: details.town,
-        description: details.description,
+        full_name:       details.full_name,
+        company_name:    details.company_name,
+        company_sector:  details.company_sector,
+        company_rc:      details.company_rc,
+        company_website: details.company_website || "",
+        town:            details.town,
+        description:     details.description,
       });
       localStorage.setItem("company_status", "pending_approval");
       setStep("pending");
       navigate("/company/dashboard");
     } catch (err: unknown) {
-      const ax = err as AxiosError;
-      const st = ax.response?.status;
-      if (st === 401 || st === 403) {
-        setStep("pending");
-        return;
-      }
+      // Always show the real error — never silently skip to pending.
+      // If you see "401 Unauthorized" here it means the token wasn't
+      // set before this request fired — increase the setTimeout above.
       setError(formatApiError(err));
     } finally {
       setLoading(false);
     }
   };
 
-  // ”€”€ STEP 1 — Credentials ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+  // ── RENDER: Step 1 — Credentials ─────────────────────────────────────────
   if (step === "credentials") {
     return (
       <div className="crf-root">
         <div className="crf-header">
           <div className="crf-icon">🏢</div>
           <h2 className="crf-title">Inscription Entreprise</h2>
-          <p className="crf-sub">
-            Créez votre espace recruteur sur Stag.io
-          </p>
+          <p className="crf-sub">Créez votre espace recruteur sur Stag.io</p>
         </div>
 
-        {/* Step indicator */}
         <div className="crf-steps">
           <div className="crf-step crf-step-active">
             <span className="crf-step-dot">1</span>
@@ -244,15 +229,13 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
 
         <div className="crf-back-login">
           Déjà inscrit ?{" "}
-          <button onClick={onBackToLogin} className="crf-link">
-            Se connecter
-          </button>
+          <button onClick={onBackToLogin} className="crf-link">Se connecter</button>
         </div>
       </div>
     );
   }
 
-  // ”€”€ STEP 2 — OTP Verification ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+  // ── RENDER: Step 2 — OTP ──────────────────────────────────────────────────
   if (step === "otp") {
     return (
       <div className="crf-root">
@@ -272,7 +255,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
             <input
               type="text"
               value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value)}
+              onChange={e => setOtpCode(e.target.value)}
               placeholder="Entrez le code à 6 chiffres"
               required
             />
@@ -289,19 +272,16 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     );
   }
 
-  // ”€”€ STEP 3 — Company Details ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+  // ── RENDER: Step 3 — Company Details ──────────────────────────────────────
   if (step === "details") {
     return (
       <div className="crf-root">
         <div className="crf-header">
           <div className="crf-icon">📋</div>
           <h2 className="crf-title">Informations de l'entreprise</h2>
-          <p className="crf-sub">
-            Ces informations seront vérifiées par l'administrateur
-          </p>
+          <p className="crf-sub">Ces informations seront vérifiées par l'administrateur</p>
         </div>
 
-        {/* Step indicator */}
         <div className="crf-steps">
           <div className="crf-step crf-step-done">
             <span className="crf-step-dot crf-dot-done">✓</span>
@@ -380,38 +360,33 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
               placeholder="ex: 16/00-123456B19"
               required
             />
-            <span className="crf-hint">
-              Obligatoire pour vérifier l'existence légale de votre entreprise
-            </span>
+            <span className="crf-hint">Obligatoire pour vérifier l'existence légale de votre entreprise</span>
           </div>
+
           <div className="crf-field">
             <label>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-              Description
+              Description *
             </label>
             <input
               type="text"
               value={details.description}
               onChange={e => setDetails({ ...details, description: e.target.value })}
-              placeholder="ex: our company is..."
+              placeholder="ex: Notre entreprise est spécialisée dans..."
               required
             />
-            <span className="crf-hint">
-              Obligatoire pour vérifier l'existence légale de votre entreprise
-            </span>
           </div>
 
           <div className="crf-field">
             <label>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z" /><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" /></svg>
-              Site web de l'entreprise *
+              Site web de l'entreprise
             </label>
             <input
-              type="url"
+              type="text"
               value={details.company_website}
               onChange={e => setDetails({ ...details, company_website: e.target.value })}
-              placeholder="ex: https://www.votreentreprise.dz"
-              required
+              placeholder="ex: https://www.votreentreprise.dz (optionnel)"
             />
           </div>
 
@@ -437,7 +412,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
     );
   }
 
-  // ”€”€ STEP 3 — Pending ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+  // ── RENDER: Step 4 — Pending ──────────────────────────────────────────────
   if (step === "pending") {
     return (
       <div className="crf-root crf-status-root">
@@ -446,34 +421,23 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
         <p className="crf-status-msg">
           Votre demande d'inscription a bien été reçue.<br />
           L'administrateur de la plateforme va examiner votre dossier
-          et vous enverrez un email de confirmation à l'adresse<br />
+          et vous enverra un email de confirmation à l'adresse<br />
           <strong>{creds.email}</strong>
         </p>
         <div className="crf-status-steps">
-          <div className="crf-status-step crf-ss-done">
-            <span>✓</span> Demande soumise
-          </div>
-          <div className="crf-status-step crf-ss-wait">
-            <span>⏳</span> Vérification par l'admin
-          </div>
-          <div className="crf-status-step crf-ss-wait">
-            <span>📧</span> Email de confirmation
-          </div>
-          <div className="crf-status-step crf-ss-wait">
-            <span>🚀</span> Accès au tableau de bord
-          </div>
+          <div className="crf-status-step crf-ss-done"><span>✓</span> Demande soumise</div>
+          <div className="crf-status-step crf-ss-wait"><span>⏳</span> Vérification par l'admin</div>
+          <div className="crf-status-step crf-ss-wait"><span>📧</span> Email de confirmation</div>
+          <div className="crf-status-step crf-ss-wait"><span>🚀</span> Accès au tableau de bord</div>
         </div>
-        <button
-          className="crf-btn-secondary"
-          onClick={onBackToLogin}
-        >
+        <button className="crf-btn-secondary" onClick={onBackToLogin}>
           ← Retour à la connexion
         </button>
       </div>
     );
   }
 
-  // ”€”€ STEP 4 — Rejected ”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€”€
+  // ── RENDER: Step 5 — Rejected ─────────────────────────────────────────────
   return (
     <div className="crf-root crf-status-root">
       <div className="crf-status-icon crf-icon-rejected">❌</div>
@@ -488,8 +452,7 @@ export default function CompanyRegisterForm({ onBackToLogin }: Props) {
         </div>
       )}
       <p className="crf-status-contact">
-        Si vous pensez qu'il s'agit d'une erreur, contactez
-        l'administrateur de la plateforme.
+        Si vous pensez qu'il s'agit d'une erreur, contactez l'administrateur de la plateforme.
       </p>
       <button className="crf-btn-secondary" onClick={onBackToLogin}>
         ← Retour à la connexion
