@@ -51,6 +51,7 @@ def list_users(request):
                 row['conventions_count'] = c.internshipoffer_set.aggregate(
                     total=Count('applications__convention')
                 )['total'] or 0
+                row['company_pk']        = c.pk
                 row['company_name']    = c.company_name or ''
                 row['company_sector']  = c.company_sector or '—'
                 row['company_website'] = c.company_website or '—'
