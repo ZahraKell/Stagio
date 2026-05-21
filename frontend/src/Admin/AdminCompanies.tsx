@@ -77,42 +77,51 @@ export default function AdminCompanies() {
 
       const mapped: Company[] = usersBody.data.map(
         (u: Record<string, unknown>) => {
-          const uid         = u.id as number;
-          const active      = Boolean(u.is_active);
-          const isApproved  = Boolean(u.is_approved);
-          const isRejected  = Boolean(u.is_rejected);
+          const uid = u.id as number;
+          const active = Boolean(u.is_active);
+          const isApproved = Boolean(u.is_approved);
+          const isRejected = Boolean(u.is_rejected);
 
           // pending fallback: if backend didn't return is_approved/is_rejected
           // (old backend), fall back to the pending list
           const pend = pendingByUserId.get(uid);
 
           let status: Company["status"];
-          if (!active)       status = "suspended";
+          if (!active) status = "suspended";
           else if (isRejected) status = "rejected";
           else if (pend && !isApproved) status = "pending";
-          else               status = "approved";
+          else status = "approved";
 
           return {
-            userId:           uid,
+            userId: uid,
             // prefer company_pk from list_users; fall back to pending list id
-            companyPk:        (u.company_pk as number) ?? (pend ? pend.id : null),
-            id:               uid,
-            company_name:     (u.company_name as string) || (u.full_name as string) || (u.username as string),
-            company_sector:   (u.company_sector as string) || (pend?.company_sector as string) || "—",
-            company_website:  (u.company_website as string) || "—",
-            company_rc:       (u.company_rc as string) || "—",
-            town:             (u.town as string) || (pend?.town as string) || "—",
-            description:      (u.description as string) || "",
-            logo:             null,
+            companyPk: (u.company_pk as number) ?? (pend ? pend.id : null),
+            id: uid,
+            company_name:
+              (u.company_name as string) ||
+              (u.full_name as string) ||
+              (u.username as string),
+            company_sector:
+              (u.company_sector as string) ||
+              (pend?.company_sector as string) ||
+              "—",
+            company_website: (u.company_website as string) || "—",
+            company_rc: (u.company_rc as string) || "—",
+            town: (u.town as string) || (pend?.town as string) || "—",
+            description: (u.description as string) || "",
+            logo: null,
             status,
-            email:            u.email as string,
-            pnum:             (u.pnum as string) || "—",
-            offers_count:     Number(u.offers_count ?? 0),
+            email: u.email as string,
+            pnum: (u.pnum as string) || "—",
+            offers_count: Number(u.offers_count ?? 0),
             conventions_count: Number(u.conventions_count ?? 0),
-            rating:           0,
-            submitted_date:   (u.submitted_date as string) || pend?.submitted_at?.split("T")[0] || "—",
-            is_approved:      isApproved,
-            is_rejected:      isRejected,
+            rating: 0,
+            submitted_date:
+              (u.submitted_date as string) ||
+              pend?.submitted_at?.split("T")[0] ||
+              "—",
+            is_approved: isApproved,
+            is_rejected: isRejected,
             rejection_reason: (u.rejection_reason as string) || undefined,
           };
         },
@@ -136,7 +145,12 @@ export default function AdminCompanies() {
       setCompanies((prev) =>
         prev.map((c) =>
           c.companyPk === companyPk
-            ? { ...c, status: "approved" as const, is_approved: true, is_rejected: false }
+            ? {
+                ...c,
+                status: "approved" as const,
+                is_approved: true,
+                is_rejected: false,
+              }
             : c,
         ),
       );
@@ -157,7 +171,12 @@ export default function AdminCompanies() {
       setCompanies((prev) =>
         prev.map((c) =>
           c.companyPk === rejectModal.companyPk
-            ? { ...c, status: "rejected" as const, is_rejected: true, rejection_reason: rejectReason }
+            ? {
+                ...c,
+                status: "rejected" as const,
+                is_rejected: true,
+                rejection_reason: rejectReason,
+              }
             : c,
         ),
       );
@@ -178,7 +197,12 @@ export default function AdminCompanies() {
       setCompanies((prev) =>
         prev.map((c) =>
           c.userId === userId
-            ? { ...c, status: activate ? ("approved" as const) : ("suspended" as const) }
+            ? {
+                ...c,
+                status: activate
+                  ? ("approved" as const)
+                  : ("suspended" as const),
+              }
             : c,
         ),
       );
@@ -206,25 +230,40 @@ export default function AdminCompanies() {
   });
 
   const counts = {
-    all:       companies.length,
-    approved:  companies.filter((c) => c.status === "approved").length,
-    pending:   companies.filter((c) => c.status === "pending").length,
-    rejected:  companies.filter((c) => c.status === "rejected").length,
+    all: companies.length,
+    approved: companies.filter((c) => c.status === "approved").length,
+    pending: companies.filter((c) => c.status === "pending").length,
+    rejected: companies.filter((c) => c.status === "rejected").length,
     suspended: companies.filter((c) => c.status === "suspended").length,
   };
 
-  const statusConfig: Record<string, { badge: string; label: string; color: string }> = {
-    approved:  { badge: "am-badge-approved",  label: "Approved",  color: "#22c55e" },
-    pending:   { badge: "am-badge-pending",   label: "Pending",   color: "#f59e0b" },
-    rejected:  { badge: "am-badge-rejected",  label: "Rejected",  color: "#ef4444" },
-    suspended: { badge: "am-badge-suspended", label: "Suspended", color: "#6b7280" },
+  const statusConfig: Record<
+    string,
+    { badge: string; label: string; color: string }
+  > = {
+    approved: {
+      badge: "am-badge-approved",
+      label: "Approved",
+      color: "#22c55e",
+    },
+    pending: { badge: "am-badge-pending", label: "Pending", color: "#f59e0b" },
+    rejected: {
+      badge: "am-badge-rejected",
+      label: "Rejected",
+      color: "#ef4444",
+    },
+    suspended: {
+      badge: "am-badge-suspended",
+      label: "Suspended",
+      color: "#6b7280",
+    },
   };
 
   const tabs = [
-    { key: "all",       label: "All",       count: counts.all },
-    { key: "approved",  label: "Approved",  count: counts.approved },
-    { key: "pending",   label: "Pending",   count: counts.pending },
-    { key: "rejected",  label: "Rejected",  count: counts.rejected },
+    { key: "all", label: "All", count: counts.all },
+    { key: "approved", label: "Approved", count: counts.approved },
+    { key: "pending", label: "Pending", count: counts.pending },
+    { key: "rejected", label: "Rejected", count: counts.rejected },
     { key: "suspended", label: "Suspended", count: counts.suspended },
   ];
 
@@ -271,7 +310,9 @@ export default function AdminCompanies() {
         >
           <option value="">All Sectors</option>
           {allSectors.map((s) => (
-            <option key={s} value={s}>{s}</option>
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
         </select>
       </div>
@@ -299,7 +340,9 @@ export default function AdminCompanies() {
           >
             <div
               className="am-company-stripe"
-              style={{ background: statusConfig[company.status]?.color || "#94a3b8" }}
+              style={{
+                background: statusConfig[company.status]?.color || "#94a3b8",
+              }}
             />
 
             <div className="am-company-card-top">
@@ -308,10 +351,14 @@ export default function AdminCompanies() {
               </div>
               <div className="am-company-info">
                 <h4>{company.company_name}</h4>
-                <span className="am-company-sector">{company.company_sector}</span>
+                <span className="am-company-sector">
+                  {company.company_sector}
+                </span>
                 <span className="am-company-town">📍 {company.town}</span>
               </div>
-              <span className={`am-company-status-badge ${statusConfig[company.status]?.badge}`}>
+              <span
+                className={`am-company-status-badge ${statusConfig[company.status]?.badge}`}
+              >
                 {statusConfig[company.status]?.label}
               </span>
             </div>
@@ -363,7 +410,12 @@ export default function AdminCompanies() {
                     ✓ Approve
                   </button>
                   <button
-                    onClick={() => setRejectModal({ show: true, companyPk: company.companyPk })}
+                    onClick={() =>
+                      setRejectModal({
+                        show: true,
+                        companyPk: company.companyPk,
+                      })
+                    }
                     className="am-btn-reject-sm"
                   >
                     ✕ Reject
@@ -372,7 +424,9 @@ export default function AdminCompanies() {
               )}
               {company.status === "approved" && (
                 <button
-                  onClick={() => handleToggleActive(company.userId, company.status)}
+                  onClick={() =>
+                    handleToggleActive(company.userId, company.status)
+                  }
                   className="am-btn-suspend-sm"
                 >
                   ⏸ Suspend
@@ -380,7 +434,9 @@ export default function AdminCompanies() {
               )}
               {company.status === "suspended" && (
                 <button
-                  onClick={() => handleToggleActive(company.userId, company.status)}
+                  onClick={() =>
+                    handleToggleActive(company.userId, company.status)
+                  }
                   className="am-btn-reactivate-sm"
                 >
                   ▶ Reactivate
@@ -410,7 +466,8 @@ export default function AdminCompanies() {
             <div className="am-modal-body">
               <div className="am-form-group">
                 <label>
-                  Reason for rejection <span style={{ color: "#ef4444" }}>*</span>
+                  Reason for rejection{" "}
+                  <span style={{ color: "#ef4444" }}>*</span>
                 </label>
                 <textarea
                   value={rejectReason}
@@ -422,7 +479,9 @@ export default function AdminCompanies() {
               </div>
               <div className="am-form-actions">
                 <button
-                  onClick={() => setRejectModal({ show: false, companyPk: null })}
+                  onClick={() =>
+                    setRejectModal({ show: false, companyPk: null })
+                  }
                   className="am-btn-cancel"
                 >
                   Cancel
@@ -519,7 +578,9 @@ export default function AdminCompanies() {
                     </div>
                     <div className="am-detail-item">
                       <span>Status</span>
-                      <span className={`am-company-status-badge ${statusConfig[selectedCompany.status]?.badge}`}>
+                      <span
+                        className={`am-company-status-badge ${statusConfig[selectedCompany.status]?.badge}`}
+                      >
                         {statusConfig[selectedCompany.status]?.label}
                       </span>
                     </div>
@@ -532,10 +593,16 @@ export default function AdminCompanies() {
                 {selectedCompany.rejection_reason && (
                   <div className="am-detail-section">
                     <h4>Rejection Reason</h4>
-                    <p style={{
-                      background: "#fff5f5", padding: ".75rem", borderRadius: 8,
-                      fontSize: ".8rem", color: "#991b1b", border: "1px solid #fecaca",
-                    }}>
+                    <p
+                      style={{
+                        background: "#fff5f5",
+                        padding: ".75rem",
+                        borderRadius: 8,
+                        fontSize: ".8rem",
+                        color: "#991b1b",
+                        border: "1px solid #fecaca",
+                      }}
+                    >
                       {selectedCompany.rejection_reason}
                     </p>
                   </div>
@@ -556,7 +623,10 @@ export default function AdminCompanies() {
                   <button
                     onClick={() => {
                       setShowDetailModal(false);
-                      setRejectModal({ show: true, companyPk: selectedCompany.companyPk });
+                      setRejectModal({
+                        show: true,
+                        companyPk: selectedCompany.companyPk,
+                      });
                     }}
                     className="am-btn-reject"
                   >
