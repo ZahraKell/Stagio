@@ -59,9 +59,13 @@ def list_users(request):
                 row['company_rc']      = c.company_rc or '—'
                 row['pnum']            = u.pnum or '—'
                 row['submitted_date']  = c.submitted_at.isoformat().split('T')[0] if c.submitted_at else '—'
+                row['is_approved']       = c.is_approved              # ← NEW
+                row['is_rejected']       = c.is_rejected              # ← NEW
+                row['rejection_reason']  = c.rejection_reason or ''   # ← NEW
             except Exception:
                 row['offers_count']    = 0
                 row['conventions_count'] = 0
+                row['company_pk']        = None
                 row['company_name']    = u.full_name or u.username
                 row['company_sector']  = '—'
                 row['company_website'] = '—'
@@ -70,6 +74,10 @@ def list_users(request):
                 row['company_rc']      = '—'
                 row['pnum']            = u.pnum or '—'
                 row['submitted_date']  = '—'
+                row['is_approved']       = False                      # ← NEW
+                row['is_rejected']       = False                      # ← NEW
+                row['rejection_reason']  = ''                         # ← NEW
+ 
         data.append(row)
     return ok(data=data, message=f"{len(data)} user(s) found.")
 
