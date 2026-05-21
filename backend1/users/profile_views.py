@@ -6,16 +6,12 @@ from django.utils import timezone
 from .models import Student, Company
 
 
-# ── HELPERS ───────────────────────────────────────────────────────────────────
-
 def ok(data=None, message="OK"):
     return Response({"error": False, "message": message, "data": data})
 
 def fail(message="Error", http_status=status.HTTP_400_BAD_REQUEST):
     return Response({"error": True, "message": message}, status=http_status)
 
-
-# ── INTERNAL HELPER (no decorators — called by profile_me) ───────────────────
 
 def get_profile(request):
     user = request.user
@@ -62,8 +58,6 @@ def get_profile(request):
     return ok(data=data, message="Profile retrieved.")
 
 
-# ── INTERNAL HELPER (no decorators — called by profile_me) ───────────────────
-
 def update_profile(request):
     user = request.user
     user.full_name = request.data.get('full_name', user.full_name)
@@ -104,9 +98,6 @@ def update_profile(request):
     return ok(message="Profile updated successfully.")
 
 
-# ── PUBLIC ENDPOINT — only this one gets the decorators ──────────────────────
-# GET + PATCH /api/auth/profile/
-
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def profile_me(request):
@@ -114,9 +105,6 @@ def profile_me(request):
         return get_profile(request)
     return update_profile(request)
 
-
-# ── SEPARATE ENDPOINT — has its own decorators since it has its own URL ───────
-# PATCH /api/auth/company/complete-profile/
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
@@ -128,8 +116,9 @@ def complete_company_profile(request):
     except Company.DoesNotExist:
         return fail("Company profile not found.", status.HTTP_404_NOT_FOUND)
 
-    required_fields = ['company_name', 'company_rc', 'company_website', 'town', 'description']
-    missing = [field for field in required_fields if not request.data.get(field)]
+    # company_website and company_sector are optional
+    required_fields = ['company_name', 'company_rc', 'town', 'description']
+    missing = [f for f in required_fields if not request.data.get(f)]
     if missing:
         return fail(f"Missing required fields: {', '.join(missing)}")
 
@@ -141,7 +130,7 @@ def complete_company_profile(request):
     company.company_name    = request.data.get('company_name')
     company.company_sector  = request.data.get('company_sector', '')
     company.company_rc      = request.data.get('company_rc')
-    company.company_website = request.data.get('company_website')
+    company.company_website = request.data.get('company_website', '') or ''
     company.town            = request.data.get('town')
     company.description     = request.data.get('description')
     if request.FILES.get('logo'):
@@ -150,4 +139,16 @@ def complete_company_profile(request):
     company.rejection_reason = None
     company.submitted_at     = timezone.now()
     company.save()
+
+    # Notify admins
+    from django.contrib.auth import get_user_model
+    from notifications.models import Notification
+    User = get_user_model()
+    admin_users = User.objects.filter(role='admin', is_active=True)
+    for admin in admin_users:
+        Notification.objects.create(
+            recipient=admin,
+            message=f"Company profile completed by {request.user.email}.",
+        )
+
     return ok(message="Company profile submitted for admin approval.")
